@@ -1,0 +1,170 @@
+# $Id$
+# Spanish translation of Drupal (general)
+# Copyright YEAR NAME <EMAIL@ADDRESS>
+# Generated from files:
+# cfdr.admin.inc: n/a
+# cfdr.module: n/a
+# cfdr.install: n/a
+# cfdr.info: n/a
+# b s <naringas@1044190.no-reply.drupal.org>, 2011.
+msgid ""
+msgstr ""
+"Project-Id-Version: PROJECT VERSION\n"
+"POT-Creation-Date: 2011-03-22 09:59-0600\n"
+"PO-Revision-Date: 2011-03-22 10:07-0500\n"
+"Last-Translator: b s <naringas@1044190.no-reply.drupal.org>\n"
+"Language-Team: null\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-Generator: Virtaal 0.6.1\n"
+
+#: cfdr.admin.inc:11
+msgid "Path where to look for .xml files"
+msgstr "Ruta en dónde buscar archivos .xml"
+
+#: cfdr.admin.inc:13
+msgid "It is recomended to use a restrictive \".htaccess\" file in this directory"
+msgstr ""
+"Es recomendado utilizar un archivo \".htaccess\" con restricciones en "
+"este directorio"
+
+#: cfdr.admin.inc:17
+msgid "Path where to move scanned .xml files"
+msgstr "Ruta a dónde mover archivos .xml escaneados"
+
+#: cfdr.admin.inc:19
+msgid "Must be different from <strong>Path where to look for .xml files</strong>"
+msgstr ""
+"Debe ser diferente de <strong>Ruta en dónde buscar archivos .xml</strong>"
+
+#: cfdr.admin.inc:27
+msgid "Reset to defaults"
+msgstr "Restablecer valores predeterminados"
+
+#: cfdr.module:140;179
+msgid "Emisor"
+msgstr "Emisor"
+
+#: cfdr.module:140;180
+msgid "Date"
+msgstr "Fecha"
+
+#: cfdr.module:140;181
+msgid "Receptor"
+msgstr "Receptor"
+
+#: cfdr.module:140;183;21;29
+msgid "Download"
+msgstr "Descargar"
+
+#: cfdr.module:159;230
+msgid "No CFDs available."
+msgstr "No CFDs disponibles."
+
+#: cfdr.module:242;295
+msgid "Filter"
+msgstr "Filtrar"
+
+#: cfdr.module:278
+msgid "Start date"
+msgstr "Fecha de inicio"
+
+#: cfdr.module:281;289
+msgid "Format: yyyy-mm-dd"
+msgstr "Formato: aaaa-mm-dd"
+
+#: cfdr.module:286
+msgid "End date"
+msgstr "Fecha final"
+
+#: cfdr.module:299;313
+msgid "Reset"
+msgstr "Reiniciar"
+
+#: cfdr.module:464
+msgid "cfdr"
+msgstr "cfdr"
+
+#: cfdr.module:464
+msgid "@count files imported succesfully"
+msgstr "@count archivos importados satisfactoriamente"
+
+#: cfdr.module:75
+msgid "administer cfdr"
+msgstr "administrar cfdr"
+
+#: cfdr.module:75
+msgid "view any CFD"
+msgstr "ver cualquier CFD"
+
+#: cfdr.module:12
+msgid "View CFDs"
+msgstr "Ver CFDs"
+
+#: cfdr.module:13
+msgid "View all CFDs"
+msgstr "Ver todos los CFDs"
+
+#: cfdr.module:37
+msgid "View CFD"
+msgstr "Ver CFD"
+
+#: cfdr.module:45
+msgid "CFD - Received Settings"
+msgstr "Opciones CFD - Recibido"
+
+#: cfdr.module:46
+msgid "Configure CFD - Received options"
+msgstr "Configurar opciones de CFD - Recibido"
+
+#: cfdr.install:27
+msgid "Stores CFDs received as file path; and also both RFCs, date, series, and number (folio)"
+msgstr ""
+"Guarda la ruta hacia el CFD; y también ambos RFCs, la fecha, serie y folio."
+
+#: cfdr.install:33
+msgid "The cfdr id"
+msgstr "Númbero ID del cfdr"
+
+#: cfdr.install:39
+msgid "cfd's series (letters)"
+msgstr "Serie del CFD (letras)"
+
+#: cfdr.install:46
+msgid "cfd's number"
+msgstr "Númbero del CFD"
+
+#: cfdr.install:52
+msgid "Emitting party's RFC"
+msgstr "RFC del emisor"
+
+#: cfdr.install:58
+msgid "Emitting party's name"
+msgstr "Nombre del receptor"
+
+#: cfdr.install:64
+msgid "Receiving party's RFC"
+msgstr "RFC del receptor"
+
+#: cfdr.install:69
+msgid "Date of the CFD"
+msgstr "Fecha del CFD"
+
+#: cfdr.install:77
+msgid "Total amount of the CFD"
+msgstr "Monto total del CFD"
+
+#: cfdr.install:83
+msgid "The full filename of the XML file"
+msgstr "Nombre de archivo completo del XML"
+
+#: cfdr.info:0
+msgid "CFD - Reception"
+msgstr "CFD - Recepción"
+
+#: cfdr.info:0
+msgid "Add CFD as content for collection (received CFDs)."
+msgstr "Agrega CFD como contenido para la recepción (CFDs recibidas)"

@@ -1,0 +1,92 @@
+<?php
+/**
+ * @file
+ * Install, update and uninstall functions for the cfdr module.
+ */ 
+ 
+/**
+ * Implementation of hook_schema().
+ */
+function cfdr_schema() {
+  $schema['cfdr'] = array(
+    'description' => 'Stores CFDs received as file path; and also both RFCs, date, series, and number (folio)',
+    'fields' => array(
+      'cfdr_id' => array(
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'description' => "The cfdr id",
+      ),
+      'serie' => array(
+        'type' => 'varchar',
+        'length' => '10',
+        'not null' => FALSE,
+        'description' => "cfd's series (letters)",      
+      ),
+      'folio' => array(
+        'type' => 'int',
+        'size' => 'normal',
+        'unsigned' => TRUE,
+        'not null' => FALSE,
+        'description' => "cfd's number",
+      ),
+      'emisor_rfc' => array(
+        'type' => 'varchar',
+        'length' => '13',
+        'not null' => FALSE,
+        'description' => "Emitting party's RFC",
+      ),
+      'emisor_nombre' => array(
+        'type' => 'text',
+        'size' => 'tiny',
+        'not null' => FALSE,
+        'description' => "Emitting party's name",
+      ),
+      'receptor_rfc' => array(
+        'type' => 'varchar',
+        'length' => '13',
+        'not null' => FALSE,
+        'description' => "Receiving party's RFC",
+      ),
+      'fecha_cfd' => array(
+        'mysql_type' => 'DATETIME',
+        'not null' => FALSE,
+        'description' => 'Date of the CFD',
+      ),
+      'importe' => array(
+        'type' => 'numeric',
+        'precision' => 9,
+        'scale' => 2,
+        'unsigned' => FALSE,
+        'not null' => FALSE,
+        'description' => 'Total amount of the CFD',
+      ),
+      'xml_filename' => array(
+        'type' => 'varchar',
+        'length' => '510',
+        'not null' => TRUE,
+        'description' => 'The full filename of the XML file',
+      ),
+      'valid' => array(
+        'type' => 'int',
+        'size' => 'tiny',
+        'unsigned' => 'true',
+        'not null' => FALSE,
+        'description' => 'Stores the validity of the CFD. NULL means it is not validated yet',
+      ),
+      'nav_number' => array(
+        'type' => 'int',
+        'size' => 'normal',
+        'not null' => FALSE,
+      ),
+    ),
+    'primary key' => array('cfdr_id'),
+    'indexes' => array(
+      'date' => array('fecha_cfd'),
+      'serie' => array('serie'),
+      'folio' => array('folio'),
+      'emisor' => array('emisor_rfc')
+    ),
+  );
+  return $schema;
+}

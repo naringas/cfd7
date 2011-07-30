@@ -1,0 +1,6 @@
+name = CFD - Reception
+description = Add CFD as content for collection (received CFDs).
+core = 7.x
+dependencies[] = cfd
+dependencies[] = date_api
+configure = admin/config/content/cfdr

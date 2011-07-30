@@ -1,0 +1,489 @@
+<?php
+/**
+ * @file Main module file
+ */
+
+/**
+ * Implementation of hook_menu().
+ */
+function cfdr_menu() {
+  $menu = array();
+  $menu['cfdr'] = array(
+    'title' => 'View CFDs',
+    'description' => 'View all CFDs',
+    'access callback' => 'user_access',
+    'access arguments' => array('view any FEs'),
+    'page callback' => 'cfdr_view_cfds',
+    // 'page arguments' => array('cfdr_view_cfds'),
+  );
+  $menu['cfdr/%/pdf'] = array(
+    'type' => MENU_CALLBACK,
+    'title' => 'Download',
+    'access callback' => 'user_access',
+    'access arguments' => array('view any FEs'),
+    'page callback' => 'cfdr_download_pdf',
+    'page arguments' => array(1),
+  );
+  $menu['cfdr/%/xml'] = array(
+    'type' => MENU_CALLBACK,
+    'title' => 'Download',
+    'access callback' => 'user_access',
+    'access arguments' => array('view any FEs'),
+    'page callback' => 'cfdr_download_xml',
+    'page arguments' => array(1),
+  );
+  $menu['cfdr/%/validar'] = array(
+    'type' => MENU_CALLBACK,
+    'title' => 'Download',
+    'access callback' => 'user_access',
+    'access arguments' => array('view any FEs'),
+    'page callback' => 'cfdr_validate_xml',
+    'page arguments' => array(1),
+  );
+  $menu['cfdr/%cfdr'] = array(
+    'type' => MENU_CALLBACK,
+    'title' => 'View CFD',
+    'access callback' => 'user_access',
+    'access arguments' => array('view any FEs'),
+    'page callback' => 'cfdr_view_single',
+    'page arguments' => array(1),
+  );
+  //Admin menu
+  $menu['admin/config/content/cfdr'] = array(
+    'title' => 'CFD - Received Settings',
+    'description' => 'Configure CFD - Received options',
+    'access callback' => 'user_access',
+    'access arguments' => array('administer cfdr'),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('cfdr_admin_form'),
+    'file'=>'cfdr.admin.inc',
+  );
+  return $menu;
+}
+
+/**
+ * Implementation of hook_theme()
+ **/
+function cfdr_theme() {
+  return array(
+    'cfdr_filters_fieldset' => array(
+      'render element' => 'form'
+    ),
+  );
+}
+
+/**
+ * Implementation of hook_perm().
+ */
+function cfdr_permission() {
+  return array('administer cfdr', 'view any CFD');
+}
+
+/**
+ * Saves a fully loaded cfdr object to {cfdr}
+ **/
+function cfdr_save(&$cfdr) {
+  return drupal_write_record('cfdr', $cfdr);
+}
+
+/**
+ * Loads then inserts a CFD into de database.
+ * @param string $cfdr_filename the full path and name of the CFD's .xml file
+ **/
+function cfdr_insert($filename) {
+  //parse XML file read (with xml DOM(simpleXML sucks at namespaces))
+  $doc = new DOMDocument();
+  @$doc->load($filename, LIBXML_NOWARNING);
+  $xpath = new DOMXPath($doc);
+  $xpath->registerNamespace('cfd', 'http://www.sat.gob.mx/cfd/2');
+  $serie = $xpath->query('/cfd:Comprobante/@serie');
+  $folio = $xpath->query('/cfd:Comprobante/@folio');
+  // abort if not on a CFD
+  if (!$folio->length) return FALSE;
+  $receptor_rfc = $xpath->query('/cfd:Comprobante/cfd:Receptor/@rfc');
+  $emisor_rfc = $xpath->query('/cfd:Comprobante/cfd:Emisor/@rfc');
+  $emisor_nombre = $xpath->query('/cfd:Comprobante/cfd:Emisor/@nombre');
+  $fecha_cfd = $xpath->query('/cfd:Comprobante/@fecha');
+  $importe = $xpath->query('/cfd:Comprobante/@total');
+
+  $cfdr = new stdClass();
+  $cfdr->serie = $serie->item(0)->value;
+  $cfdr->folio = $folio->item(0)->value;
+  $cfdr->receptor_rfc = $receptor_rfc->item(0)->value;
+  $cfdr->emisor_rfc = $emisor_rfc->item(0)->value;
+  $cfdr->emisor_nombre = $emisor_nombre->item(0)->value;
+  $cfdr->fecha_cfd = $fecha_cfd->item(0)->value;
+  $cfdr->importe = $importe->item(0)->value;
+  $cfdr->xml_filename = $filename;
+
+  return cfdr_save($cfdr);
+}
+
+/**
+ * Loads a cfdr object and returns it
+ * @param int $cfdr_id Id of the CFD to retreive
+ * @return stdObject a loaded node-like object.
+ */
+function cfdr_load($cfdr_id) {
+  return db_query('SELECT * FROM {cfdr} WHERE cfdr_id=?', array($cfdr_id))->fetchObject();
+}
+
+/**
+ * Returns the filename of a CFD
+ * @param int $cfdr_id Id of the CFD to retreive
+ */
+function cfdr_load_filename($cfdr_id) {
+  return db_query('SELECT xml_filename FROM {cfdr} WHERE cfdr_id=?', array($cfdr_id))->fetchField();
+}
+
+/**
+ * 'cfdr' menu entry callback
+ **/
+function cfdr_view_cfds() {
+  $query = db_select('cfdr', 'c')->fields('c');
+  $filters = isset($_SESSION['cfdr_filters']) ? $_SESSION['cfdr_filters'] : null;
+  if (isset($filters)) {
+    foreach ($filters as $filter => $value) {
+      switch ($filter) {
+        default:
+          $or = db_or();
+          foreach ($value as $v) {
+            if ($v == NULL)
+              $or->isNull($filter);
+            else
+              $or->condition($filter, $v);
+          }
+          $query->condition($or);
+        break;
+        case 'fecha_cfd':
+          $query->condition(db_and()->condition('fecha_cfd', $value['start'], '>=')->condition('fecha_cfd', $value['end'], '<='));
+        break;
+        case 'emisor_nombre':
+          $query->condition($filter, '%%'.$value.'%%', 'LIKE');
+        break;
+      }
+    }
+  }
+
+  $header = array(
+    t('Valid'),
+    array('data' => 'Serie', 'field' => 'serie'),
+    array('data' => 'Folio', 'field' => 'folio'),
+    array('data' => t('Emisor'), 'field' => 'emisor_rfc'),
+    array('data' => t('Date'), 'field' => 'fecha_cfd', 'sort' => 'desc'),
+    array('data' => t('Receptor'), 'field' => 'receptor_rfc'),
+    array('data' => '$', 'field' => 'importe'),
+    array('data' => 'NAV FC', 'field' => 'nav_number'),
+    'Archivo',
+    // array('data' => 'archivo', 'field' => 'xml_filename'),
+    t('Download'),
+  );
+
+  $query = $query->extend('PagerDefault')->limit(30)->extend('TableSort')->orderByHeader($header);
+  $results = $query->execute();
+  foreach ($results as $cfd) {
+    $basename = basename($cfd->xml_filename);
+    $name = substr($basename, 0, strrpos($basename, '.'));
+    $fecha = new DateObject($cfd->fecha_cfd, date_default_timezone(), DATE_FORMAT_DATETIME);
+    $rows[] = array(
+      array('data' => cfdr_validity_image($cfd->valid, $cfd->cfdr_id)),
+      array('data' => $cfd->serie),
+      array('data' => $cfd->folio),
+      array('data' => $cfd->emisor_nombre),
+      array('data' => format_date($fecha->format(DATE_FORMAT_UNIX), 'custom', 'j M Y')),
+      // array('data' => $cfd->fecha_cfd),
+      array('data' => $cfd->receptor_rfc),
+      array('data' => $cfd->importe),
+      array('data' => $cfd->nav_number),
+      array('data' => basename($cfd->xml_filename)),
+      array('data' => cfdr_get_dl_links($name, $cfd->cfdr_id)),
+    );
+  }
+  if (empty($rows))
+    $rows[] = array(array('data' => t('No CFDs available.'), 'colspan' => '10'));
+
+  return drupal_render(drupal_get_form('cfdr_filters_form')) . theme('table', array('header'=>$header, 'rows'=>$rows));
+}
+
+/**
+ * filter form for 'cfdr' menu entry callback
+ **/
+function cfdr_filters_form() {
+  // cfd_include_datepick();
+  $form['filters'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Filter'),
+    '#collapsible' => TRUE,
+    '#collapsed' => FALSE,
+  );
+  $form['filters']['serie'] = array(
+    '#type' => 'select',
+    '#title' => 'Serie',
+    '#default_value' => @array_keys($_SESSION['cfdr_filters']['serie']),
+    '#options' => _cfdr_get_select('serie'),
+    '#multiple' => TRUE,
+  );
+  $form['filters']['emisor_nombre'] = array(
+    '#type' => 'textfield',
+    '#title' => 'Nombre emisor',
+    '#size' => 50,
+    '#maxlength' => 255,
+    '#default_value' => $_SESSION['cfdr_filters']['emisor_nombre']
+  );
+  // RFCs
+  // $form['filters']['emisor_rfc'] = array(
+  //   '#type' => 'select',
+  //   '#title' => 'RFC Emisor',
+  //   '#default_value' =>  @array_keys($_SESSION['cfdr_filters']['emisor_rfc']),
+  //   '#options' => _cfdr_get_select('emisor_rfc'),
+  //   '#multiple' => TRUE,
+  // );
+  $form['filters']['receptor_rfc'] = array(
+    '#type' => 'select',
+    '#title' => 'RFC Receptor',
+    '#default_value' =>  @array_keys($_SESSION['cfdr_filters']['receptor_rfc']),
+    '#options' => _cfdr_get_select('receptor_rfc'),
+    '#multiple' => TRUE,
+  );
+  // Date filter
+  $form['filters']['fecha_cfd']['start'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Start date'),
+    '#size' => 10,
+    '#maxlength' => 10,
+    '#description' => t('Format: yyyy-mm-dd'),
+    '#default_value' => substr($_SESSION['cfdr_filters']['fecha_cfd']['start'], 0, 10),
+  );
+  $form['filters']['fecha_cfd']['end'] = array(
+    '#type' => 'textfield',
+    '#title' => t('End date'),
+    '#size' => 10,
+    '#maxlength' => 10,
+    '#description' => t('Format: yyyy-mm-dd'),
+    '#default_value' => substr($_SESSION['cfdr_filters']['fecha_cfd']['end'], 0, 10),
+  );
+  // Buttons
+  $form['filters']['filter'] = array(
+    '#type' => 'submit',
+    '#value' => t('Filter'),
+  );
+  $form['filters']['reset'] = array(
+    '#type' => 'submit',
+    '#value' => t('Reset'),
+  );
+  $form['filters']['#theme'] = 'cfdr_filters_fieldset';
+  // $form['#redirect'] = 'cfdr';
+  // $form['#validate'][] = 'cfdr_filters_form_validate';
+  $form['#submit'][] = 'cfdr_filters_form_submit';
+  return $form;
+}
+
+/**
+ *
+ **/
+function cfdr_filters_form_submit($form, &$form_state) {
+  unset($_SESSION['cfdr_filters']);
+  if ($form_state['values']['op'] == t('Reset')) {
+    return;
+  }
+  $filters = &$_SESSION['cfdr_filters'];
+  $values = $form_state['values'];
+  // dpm($form);
+
+  // foreach ($values['emisor_rfc'] as $key)
+  //   $filters['emisor_rfc'][$key] = $form['filters']['emisor_rfc']['#options'][$key];
+
+  foreach ($values['serie'] as $key)
+    $filters['serie'][$key] = $form['filters']['serie']['#options'][$key];
+
+  foreach ($values['receptor_rfc'] as $key)
+    $filters['receptor_rfc'][$key] = $form['filters']['receptor_rfc']['#options'][$key];
+
+  if ($values['start']) {
+    $start = date_create($values['start']);
+    $filters['fecha_cfd']['start'] = date_format($start, DATE_FORMAT_ISO);
+  }
+  if ($values['end']) {
+    // 86399 seconds = one day - 1 second
+    $end = date_create(date_format(date_create($values['end']), DATE_FORMAT_UNIX) + 86399, NULL, DATE_UNIX);
+    $filters['fecha_cfd']['end'] = date_format($end, DATE_FORMAT_ISO);
+  }
+  if ($values['emisor_nombre']) {
+    $filters['emisor_nombre'] = $values['emisor_nombre'];
+  }
+}
+
+/**
+ * used to populate fields in cfdr_filter_form()
+ *
+ **/
+function _cfdr_get_select($field) {
+  $query = db_select('cfdr', 'c')->groupBy('c.'.$field)->orderBy('c.'.$field);
+  $query->addField('c', $field);
+  $results = $query->execute()->fetchAll();
+  $options = array();
+  foreach ($results as $r)
+    $options[] = $r->$field;
+  return $options;
+}
+
+/**
+ * Theme for for cfdr_filter_form()
+ **/
+function theme_cfdr_filters_fieldset($variables) {
+  $form = $variables['form'];
+  $output = '';
+  $output .= drupal_render($form['emisor_nombre']);
+  $output .= '<div style="display: table-row;">';
+    $output .= '<div style="display: table-cell; padding-right: 15px">' . drupal_render($form['serie']) . '</div>';
+    // $output .= '<div style="display: table-cell; padding-right: 15px">' . drupal_render($form['emisor_rfc']) . '</div>';
+    $output .= '<div style="display: table-cell;">' . drupal_render($form['receptor_rfc']) . '</div>';
+  $output .= '</div><div style="display: table-row;">';
+    $output .= '<div style="display: table-cell; padding-right: 15px">' . drupal_render($form['fecha_cfd']['start']) . '</div>';
+    $output .= '<div style="display: table-cell;">' . drupal_render($form['fecha_cfd']['end']) . '</div>';
+  $output .= '</div>';
+  $output .= drupal_render($form['filter']) . drupal_render($form['reset']);
+  return $output;
+}
+
+/**
+ * Returns the xml file of the cfd node for download.
+ * @param StdObject $node
+ */
+function cfdr_download_xml($cfdr_id) {
+  $filename = cfdr_load_filename($cfdr_id);
+  $basename = basename($filename);
+
+  // Code based on file_transfer() but modified to serve files outside the
+  // drupal file system
+  if (ob_get_level()) {
+    ob_end_clean();
+  }
+
+
+  // Transfer file in 1024 byte chunks to save memory usage.
+  if ($fd = fopen($filename, 'rb')) {
+    drupal_add_http_header('Content-Description', 'File Transfer');
+    drupal_add_http_header('Content-Disposition',  'attachment; filename='.$basename, TRUE);
+    drupal_add_http_header('Content-type', 'text/xml', TRUE);
+    while (!feof($fd)) {
+      print fread($fd, 1024);
+    }
+    fclose($fd);
+  }
+  else {
+    drupal_not_found();
+  }
+  exit();
+}
+
+/**
+ * Gets the out of the node and gets the PDF from cfd_make_pdf() then
+ * sends it to the browser.
+ * @param StdObject $node
+ */
+function cfdr_download_pdf($cfdr_id) {
+  //generate PDF
+  $pdf = cfd_make_pdf(cfdr_load_filename($cfdr_id));
+  //send generated file to browser
+  // $pdf->SetTitle($node->title);
+  // $pdf->SetDisplayMode('fullpage');
+  // $pdf->Output("$node->title.pdf");
+  $pdf->Output();
+}
+
+function cfdr_view_single($cfd) {
+  // kpr($cfd);
+  $doc = new DOMDocument();
+  $doc->load($cfd->xml_filename, LIBXML_NOWARNING);
+  $xsl_content_file = drupal_get_path('module', 'cfd') . '/resources/cfd_html.xsl';
+  $xsl_content = new DOMDocument(); $xsl_content->load($xsl_content_file);
+  $xsl = new XSLTProcessor(); $xsl->importStylesheet($xsl_content);
+  $html_content = $xsl->transformToXml($doc);
+  $r_array = array(
+    'content' => array(
+      '#markup' => $html_content,
+    ),
+  );
+  return drupal_render($r_array);
+}
+/**
+ * Validates the CFD aginst the XML schema
+ * structure validation
+ **/
+function cfdr_validate_xml($cfd_id) {
+  $validity = cfd_xml_schema_validate(cfdr_load_filename($cfd_id));
+  $update = array(
+    'cfdr_id' => $cfd_id,
+    'valid' => $validity,
+  );
+  drupal_write_record('cfdr', $update, 'cfdr_id');
+  drupal_goto('cfdr');
+}
+
+/**
+ * returns the links string to download this cfd node as xml or pdf by using l()
+ * @return String link
+ */
+function cfdr_get_dl_links($name, $cfd_id) {
+  // add $node_title.pdf to PDF dl path so Adobe Reader gets that as a filename
+  return  l('PDF', "cfdr/$cfd_id/pdf/$name.pdf") . ' | ' . l('XML', "cfdr/$cfd_id/xml");
+}
+
+/**
+ * Get the appropriate image for valid, invalid, and to be determined CFD validity
+ *
+ **/
+function cfdr_validity_image($status, $cfd_id) {
+  switch ($status) {
+    case NULL:
+      return l(theme('image', array('path'=>'misc/watchdog-warning.png', 'title'=>'Click para validar')), "cfdr/$cfd_id/validar", array('html' => TRUE));
+      break;
+    case TRUE:
+      return theme('image', array('path'=>'misc/watchdog-ok.png'));
+      break;
+    case FALSE:
+      return theme('image', array('path'=>'misc/watchdog-error.png'));
+      break;
+  }
+}
+
+/*
+ * Implementation of hook_cron().
+ */
+function cfdr_cron() {
+  cfdr_scan();
+}
+
+/**
+ * Scans for .xml cfds in configured directory and moves XML CFDs into $to_dir
+ * $to_dir is named MMYYYY so it groups CFDs
+ **/
+function cfdr_scan() {
+  $scan_path = variable_get('cfdr_scan_path', 'sites/default/cfd/new'); // new XMLs directory
+  $fail_path = variable_get('cfdr_fail_path', 'sites/default/cfd/fail'); // move failed (non-CFD) XMLs to this dir
+  $move_to = variable_get('cfdr_move_path', 'sites/default/cfd'); //base directory
+  $to_dir = date('mY'); //monthly directory
+  $move_path = $move_to . '/' . $to_dir; //move CFDs into here
+
+  if ($files = file_scan_directory($scan_path, '/.*\.(xml|XML)$/')) {
+    $count = 0;
+    if (!is_dir($move_path)) {
+      if (file_prepare_directory($move_path, FILE_CREATE_DIRECTORY | FILE_MODIFY_PERMISSIONS))
+        file_create_htaccess($move_path);
+    }
+    foreach ($files as $file) {
+      if ($count > 100) break;
+      $new_filename = $move_path . '/' . $file->filename;
+      if ($resulting_fileuri = file_unmanaged_move($file->uri, $new_filename)) {
+        if (cfdr_insert($resulting_fileuri)) // add entry to {cfdr} form .xml file
+          $count++;
+        else {
+          file_unmanaged_move($resulting_fileuri, $fail_path . '/' . basename($resulting_fileuri));
+        }
+      }
+    }
+  }
+  if ($count > 0)
+    watchdog('cfdr', '@count files imported succesfully', array('@count' => $count), WATCHDOG_NOTICE);
+}
