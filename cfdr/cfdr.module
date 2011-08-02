@@ -12,7 +12,7 @@ function cfdr_menu() {
     'title' => 'View CFDs',
     'description' => 'View all CFDs',
     'access callback' => 'user_access',
-    'access arguments' => array('view any FEs'),
+    'access arguments' => array('view any CFD'),
     'page callback' => 'cfdr_view_cfds',
     // 'page arguments' => array('cfdr_view_cfds'),
   );
@@ -20,7 +20,7 @@ function cfdr_menu() {
     'type' => MENU_CALLBACK,
     'title' => 'Download',
     'access callback' => 'user_access',
-    'access arguments' => array('view any FEs'),
+    'access arguments' => array('view any CFD'),
     'page callback' => 'cfdr_download_xml',
     'page arguments' => array(1),
   );
@@ -29,7 +29,7 @@ function cfdr_menu() {
     'type' => MENU_CALLBACK,
     'title' => 'View CFD',
     'access callback' => 'user_access',
-    'access arguments' => array('view any FEs'),
+    'access arguments' => array('view any CFD'),
     'page callback' => 'cfdr_view_single',
     'page arguments' => array(1),
   );
@@ -37,7 +37,7 @@ function cfdr_menu() {
   //   'type' => MENU_CALLBACK,
   //   'title' => 'Download',
   //   'access callback' => 'user_access',
-  //   'access arguments' => array('view any FEs'),
+  //   'access arguments' => array('view any CFD'),
   //   'page callback' => 'cfdr_validate_xml',
   //   'page arguments' => array(1),
   // );
@@ -69,7 +69,16 @@ function cfdr_theme() {
  * Implementation of hook_perm().
  */
 function cfdr_permission() {
-  return array('administer cfdr', 'view any CFD');
+  return array(
+    'administer cfdr' => array(
+      'title' => t('Administer CFDr module'),
+      'description' => t('Select directories to scan'),
+    ),
+    'view any CFD' => array(
+      'title' => t('View CFDs'),
+      'description' => t('Allows role to view any and all CFDs'),
+    ),
+  );
 }
 
 /**
