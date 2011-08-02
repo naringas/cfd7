@@ -146,12 +146,6 @@
 					</table>
 				</td>
 			</tr>
-			<tr></tr><tr></tr>
-			<tr>
-				<td class="l" colspan="2">
-					<strong>Sello</strong><br/>
-				</td>
-			</tr>
 		</table>
 	</xsl:template>
 
