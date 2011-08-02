@@ -16,14 +16,6 @@ function cfdr_menu() {
     'page callback' => 'cfdr_view_cfds',
     // 'page arguments' => array('cfdr_view_cfds'),
   );
-  $menu['cfdr/%/pdf'] = array(
-    'type' => MENU_CALLBACK,
-    'title' => 'Download',
-    'access callback' => 'user_access',
-    'access arguments' => array('view any FEs'),
-    'page callback' => 'cfdr_download_pdf',
-    'page arguments' => array(1),
-  );
   $menu['cfdr/%/xml'] = array(
     'type' => MENU_CALLBACK,
     'title' => 'Download',
@@ -32,14 +24,7 @@ function cfdr_menu() {
     'page callback' => 'cfdr_download_xml',
     'page arguments' => array(1),
   );
-  $menu['cfdr/%/validar'] = array(
-    'type' => MENU_CALLBACK,
-    'title' => 'Download',
-    'access callback' => 'user_access',
-    'access arguments' => array('view any FEs'),
-    'page callback' => 'cfdr_validate_xml',
-    'page arguments' => array(1),
-  );
+  // HTML view
   $menu['cfdr/%cfdr'] = array(
     'type' => MENU_CALLBACK,
     'title' => 'View CFD',
@@ -48,6 +33,14 @@ function cfdr_menu() {
     'page callback' => 'cfdr_view_single',
     'page arguments' => array(1),
   );
+  // $menu['cfdr/%/validar'] = array(
+  //   'type' => MENU_CALLBACK,
+  //   'title' => 'Download',
+  //   'access callback' => 'user_access',
+  //   'access arguments' => array('view any FEs'),
+  //   'page callback' => 'cfdr_validate_xml',
+  //   'page arguments' => array(1),
+  // );
   //Admin menu
   $menu['admin/config/content/cfdr'] = array(
     'title' => 'CFD - Received Settings',
@@ -174,35 +167,49 @@ function cfdr_view_cfds() {
     array('data' => t('Receptor'), 'field' => 'receptor_rfc'),
     array('data' => '$', 'field' => 'importe'),
     array('data' => 'NAV FC', 'field' => 'nav_number'),
-    'Archivo',
+    // 'Archivo',
     // array('data' => 'archivo', 'field' => 'xml_filename'),
-    t('Download'),
+    // t('Download'),
   );
 
   $query = $query->extend('PagerDefault')->limit(30)->extend('TableSort')->orderByHeader($header);
   $results = $query->execute();
+
+  $r = 0; // row number iterator
+  $i = 1; // even-odd iterator
   foreach ($results as $cfd) {
     $basename = basename($cfd->xml_filename);
     $name = substr($basename, 0, strrpos($basename, '.'));
     $fecha = new DateObject($cfd->fecha_cfd, date_default_timezone(), DATE_FORMAT_DATETIME);
-    $rows[] = array(
-      array('data' => cfdr_validity_image($cfd->valid, $cfd->cfdr_id)),
-      array('data' => $cfd->serie),
-      array('data' => $cfd->folio),
-      array('data' => $cfd->emisor_nombre),
-      array('data' => format_date($fecha->format(DATE_FORMAT_UNIX), 'custom', 'j M Y')),
-      // array('data' => $cfd->fecha_cfd),
-      array('data' => $cfd->receptor_rfc),
-      array('data' => $cfd->importe),
-      array('data' => $cfd->nav_number),
-      array('data' => basename($cfd->xml_filename)),
-      array('data' => cfdr_get_dl_links($name, $cfd->cfdr_id)),
+    $rows[$r++] = array(
+      'data' => array(
+        array('data' => cfdr_validity_image($cfd->valid, $cfd->cfdr_id), 'style' => 'text-align:center;'),
+        $cfd->serie,
+        $cfd->folio,
+        $cfd->emisor_nombre,
+        format_date($fecha->format(DATE_FORMAT_UNIX), 'custom', 'j M Y'),
+        $cfd->receptor_rfc,
+        $cfd->importe,
+        $cfd->nav_number,
+      ),
+      'no_striping' => TRUE,
+      'class' => ($i % 2 == 0) ? 'even' : 'odd',
+    );
+    $rows[$r++] = array(
+      'data' => array(
+        // array('data' => 'Archivo', 'header' => TRUE),
+        array('data' => 'Archivo -&gt;', 'style' =>'font-style:italic; font-weight: bolder;'),
+        array('data' => l(basename($cfd->xml_filename), "cfdr/{$cfd->cfdr_id}/xml"), 'colspan' => 6),
+        array('data' => l('Ver', "cfdr/{$cfd->cfdr_id}")),
+      ),
+      'no_striping' => TRUE,
+      'class' => ($i++ % 2 == 0) ? 'even' : 'odd',
     );
   }
-  if (empty($rows))
-    $rows[] = array(array('data' => t('No CFDs available.'), 'colspan' => '10'));
 
-  return drupal_render(drupal_get_form('cfdr_filters_form')) . theme('table', array('header'=>$header, 'rows'=>$rows));
+  return drupal_render(drupal_get_form('cfdr_filters_form')) .
+    theme('table', array('header' => $header, 'rows' => $rows, 'empty' => t('No CFDs available.'))) .
+    theme('pager', array('tags' => array()));
 }
 
 /**
@@ -392,8 +399,12 @@ function cfdr_download_pdf($cfdr_id) {
   $pdf->Output();
 }
 
+/*
+ * Visualize a single CFD in a HTML page
+ */
 function cfdr_view_single($cfd) {
-  // kpr($cfd);
+  drupal_set_breadcrumb(array(l(t('Home'), ''), l('Ver CFDs', 'cfdr')));
+
   $doc = new DOMDocument();
   $doc->load($cfd->xml_filename, LIBXML_NOWARNING);
   $xsl_content_file = drupal_get_path('module', 'cfd') . '/resources/cfd_html.xsl';
@@ -407,6 +418,7 @@ function cfdr_view_single($cfd) {
   );
   return drupal_render($r_array);
 }
+
 /**
  * Validates the CFD aginst the XML schema
  * structure validation
@@ -419,15 +431,6 @@ function cfdr_validate_xml($cfd_id) {
   );
   drupal_write_record('cfdr', $update, 'cfdr_id');
   drupal_goto('cfdr');
-}
-
-/**
- * returns the links string to download this cfd node as xml or pdf by using l()
- * @return String link
- */
-function cfdr_get_dl_links($name, $cfd_id) {
-  // add $node_title.pdf to PDF dl path so Adobe Reader gets that as a filename
-  return  l('PDF', "cfdr/$cfd_id/pdf/$name.pdf") . ' | ' . l('XML', "cfdr/$cfd_id/xml");
 }
 
 /**

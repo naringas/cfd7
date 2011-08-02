@@ -5,7 +5,6 @@
 		<style type="text/css">
 			.top {
 				text-align: center;
-				border-bottom: 2px solid black;
 				font-size: 12pt
 			}
 			table {
@@ -20,7 +19,6 @@
 				text-align: left;
 			}
 			td.box {
-				border: 1px solid black;
 			}
 			tr.bottom {
 			}
@@ -44,7 +42,6 @@
 				text-align: right;
 			}
 			.box {
-				border: 1px solid black;
 			}
 		</style>
 		<span style="font-size: 8px"><br/></span>
