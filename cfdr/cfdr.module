@@ -33,14 +33,14 @@ function cfdr_menu() {
     'page callback' => 'cfdr_view_single',
     'page arguments' => array(1),
   );
-  // $menu['cfdr/%/validar'] = array(
-  //   'type' => MENU_CALLBACK,
-  //   'title' => 'Download',
-  //   'access callback' => 'user_access',
-  //   'access arguments' => array('view any CFD'),
-  //   'page callback' => 'cfdr_validate_xml',
-  //   'page arguments' => array(1),
-  // );
+  $menu['cfdr/%/validar'] = array(
+    'type' => MENU_CALLBACK,
+    'title' => 'Download',
+    'access callback' => 'user_access',
+    'access arguments' => array('view any CFD'),
+    'page callback' => 'cfdr_validate_xml',
+    'page arguments' => array(1),
+  );
   //Admin menu
   $menu['admin/config/content/cfdr'] = array(
     'title' => 'CFD - Received Settings',
@@ -433,13 +433,30 @@ function cfdr_view_single($cfd) {
  * structure validation
  **/
 function cfdr_validate_xml($cfd_id) {
-  $validity = cfd_xml_schema_validate(cfdr_load_filename($cfd_id));
-  $update = array(
-    'cfdr_id' => $cfd_id,
-    'valid' => $validity,
-  );
-  drupal_write_record('cfdr', $update, 'cfdr_id');
-  drupal_goto('cfdr');
+  //get cadena_original from SAT provided XSLT file.
+  libxml_use_internal_errors(TRUE);
+  $doc = new DOMDocument();
+  $doc->load(cfdr_load_filename($cfd_id), LIBXML_NOWARNING);
+
+  $xsl_content_file = drupal_get_path('module', 'cfd') . '/resources/sat/cadenaoriginal_2_0.xslt';
+  $xsl_content = new DOMDocument();
+  $xsl_content->load($xsl_content_file, LIBXML_NOWARNING);
+
+  $xsl = new XSLTProcessor(); $xsl->importStylesheet($xsl_content);
+  $cadena_original = $xsl->transformToXml($doc);
+
+  $xpath = new DOMXPath($doc);
+  $xpath->registerNamespace('cfd', 'http://www.sat.gob.mx/cfd/2');
+  $certificado = $xpath->query('/cfd:Comprobante/@certificado');
+  $sello = $xpath->query('/cfd:Comprobante/@sello');
+
+  $pub_cer = "-----BEGIN CERTIFICATE-----\r\n";
+  $pub_cer .= wordwrap($certificado->item(0)->value, 64, "\r\n", true);
+  $pub_cer .= "\r\n-----END CERTIFICATE-----";
+
+  $pub_key = openssl_pkey_get_public($pub_cer);
+
+  openssl_verify($cadena_original, base64_decode($sello->item(0)->value), $pub_key);
 }
 
 /**
