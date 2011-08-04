@@ -429,12 +429,10 @@ function cfdr_view_single($cfd) {
 }
 
 /**
- * Validates the CFD aginst the XML schema
- * structure validation
+ * Validates the CFD's 'sello'
  **/
-function cfdr_validate_xml($cfd_id) {
+function cfdr_validate_sello($cfd_id) {
   //get cadena_original from SAT provided XSLT file.
-  libxml_use_internal_errors(TRUE);
   $doc = new DOMDocument();
   $doc->load(cfdr_load_filename($cfd_id), LIBXML_NOWARNING);
 
@@ -442,21 +440,31 @@ function cfdr_validate_xml($cfd_id) {
   $xsl_content = new DOMDocument();
   $xsl_content->load($xsl_content_file, LIBXML_NOWARNING);
 
-  $xsl = new XSLTProcessor(); $xsl->importStylesheet($xsl_content);
+  $xsl = new XSLTProcessor(); @$xsl->importStylesheet($xsl_content);
   $cadena_original = $xsl->transformToXml($doc);
 
   $xpath = new DOMXPath($doc);
   $xpath->registerNamespace('cfd', 'http://www.sat.gob.mx/cfd/2');
   $certificado = $xpath->query('/cfd:Comprobante/@certificado');
-  $sello = $xpath->query('/cfd:Comprobante/@sello');
+  $sello = $xpath->query('/cfd:Comprobante/@sello')->item(0)->value;
 
-  $pub_cer = "-----BEGIN CERTIFICATE-----\r\n";
-  $pub_cer .= wordwrap($certificado->item(0)->value, 64, "\r\n", true);
-  $pub_cer .= "\r\n-----END CERTIFICATE-----";
+  // Since @certificado is optional in a CFD
+  if($certificado->length) {
+    //convert $certificado into something openssl can parse
+    $pub_cer = "-----BEGIN CERTIFICATE-----\r\n";
+    $pub_cer .= wordwrap($certificado->item(0)->value, 64, "\r\n", true);
+    $pub_cer .= "\r\n-----END CERTIFICATE-----";
+    $pub_key = openssl_pkey_get_public($pub_cer);
 
-  $pub_key = openssl_pkey_get_public($pub_cer);
-
-  openssl_verify($cadena_original, base64_decode($sello->item(0)->value), $pub_key);
+    $v = openssl_verify($cadena_original, base64_decode($sello), $pub_key);
+    if ($v == 1) {
+      return 'valido';
+    }
+    else if ($v == 0) {
+      return 'invalido';
+    }
+  } else
+    return 'indeterminado';
 }
 
 /**
