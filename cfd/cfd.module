@@ -99,10 +99,11 @@ function cfd_make_pdf($xml) {
 
 /**
  * Validates a CFD against cfdv2.xsd (XML Schema provided by SAT)
+ * removes Addenda and Complemento nodes to avoid issues
  * @param mixed $xml filename or xml data to validate
  * @return bool true if it is a valid xml
  */
-function cfd_xml_schema_validate($xml) {
+function cfd_validate_schema($xml) {
   $doc = new DOMDocument();
   //load xml data string or filename
   if (is_file($xml))
@@ -110,7 +111,63 @@ function cfd_xml_schema_validate($xml) {
   else
     $doc->loadXML($xml);
 
+  // gather problem nodes: Addenda, Complemento
+  $doc_el = $doc->documentElement;
+  $addenda_list = $doc_el->getElementsByTagName('Addenda');
+  $complemento_list = $doc_el->getElementsByTagName('Complemento');
+  //remove these gathered nodes
+  foreach($addenda_list as $addenda) {
+    $doc_el->removeChild($addenda);
+  }
+  foreach($complemento_list as $complemento) {
+    $doc_el->removeChild($complemento);
+  }
+
   $schemaFileName = drupal_get_path('module', 'cfd') . '/resources/sat/cfdv2.xsd';
   $validcfd = @$doc->schemaValidate($schemaFileName);
   return $validcfd;
+}
+
+/**
+ * Validates the CFD's 'sello'
+ * @param mixed $xml The xml string or .xml file of the CFD to convert to PDF
+ * @return string valido, invalido or intdeterminado
+ **/
+function cfd_validate_sello($xml) {
+  // get cadena original using SAT provided XSLT file.
+  $doc = new DOMDocument();
+  if (is_file($xml))
+    $doc->load($xml, LIBXML_NOWARNING);
+  else
+    $doc->loadXML($xml);
+
+  $xsl_content_file = drupal_get_path('module', 'cfd') . '/resources/sat/cadenaoriginal_2_0.xslt';
+  $xsl_content = new DOMDocument();
+  $xsl_content->load($xsl_content_file, LIBXML_NOWARNING);
+
+  $xsl = new XSLTProcessor(); @$xsl->importStylesheet($xsl_content);
+  $cadena_original = $xsl->transformToXml($doc);
+
+  $xpath = new DOMXPath($doc);
+  $xpath->registerNamespace('cfd', 'http://www.sat.gob.mx/cfd/2');
+  $certificado = $xpath->query('/cfd:Comprobante/@certificado');
+  $sello = $xpath->query('/cfd:Comprobante/@sello')->item(0)->value;
+
+  // Since @certificado is optional in a CFD
+  if($certificado->length) {
+    // convert $certificado into something openssl can parse
+    $pub_cer = "-----BEGIN CERTIFICATE-----\r\n";
+    $pub_cer .= wordwrap($certificado->item(0)->value, 64, "\r\n", true);
+    $pub_cer .= "\r\n-----END CERTIFICATE-----";
+    $pub_key = openssl_pkey_get_public($pub_cer);
+
+    $v = openssl_verify($cadena_original, base64_decode($sello), $pub_key);
+    if ($v == 1) {
+      return 'valido';
+    }
+    else if ($v == 0) {
+      return 'invalido';
+    }
+  } else
+    return 'indeterminado';
 }
