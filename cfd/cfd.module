@@ -10,7 +10,7 @@
 function _cfd_format_money($value) {
   $value_arr = explode('.', $value);
   $value_arr[0] = strrev(wordwrap(strrev($value_arr[0]), 3, ',', TRUE));
-  $value_arr[1] = strlen($value_arr[1]) >= 2 ? $value_arr[1] : $value_arr[1] . '0';
+  // $value_arr[1] = strlen($value_arr[1]) >= 2 ? $value_arr[1] : $value_arr[1] . '0';
   return implode('.', $value_arr);
 }
 

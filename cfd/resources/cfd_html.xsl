@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform" xmlns:cfd="http://www.sat.gob.mx/cfd/2">
+<xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform" xmlns:cfd="http://www.sat.gob.mx/cfd/2" xmlns:php="http://php.net/xsl">
 <xsl:output method="html"/>
 	<xsl:template match="/cfd:Comprobante">
 		<style type="text/css">
@@ -36,47 +36,32 @@
 				font-weight: bold;
 			}
 			td.l {
-				text-align: left;
+				text-align: right;
 			}
 			td.r {
-				text-align: right;
+				text-align: left;
 			}
 			.box {
 			}
 		</style>
-		<span style="font-size: 8px"><br/></span>
-		<div class="top">
-			<xsl:apply-templates select="cfd:Emisor"/>
-		</div>
 		<table cellpadding="4" cellspacing="3">
+			<tr>
+				<th colspan="2">
+					<div class="top">
+						<xsl:apply-templates select="cfd:Emisor"/>
+					</div>
+				</th>
+			</tr>
 			<tr class="center-txt">
 				<td>
-					<strong>Domicilio:</strong><br/>
-					<xsl:apply-templates select="cfd:Emisor/cfd:DomicilioFiscal"/>
-				</td>
-				<td>
-					<strong>Expedido En:</strong><br/>
-					<xsl:apply-templates select="cfd:Emisor/cfd:ExpedidoEn"/>
-				</td>
-			</tr>
-			<tr>
-				<td class="box">
-					<strong>Facturar a:</strong><br/>
-					<xsl:apply-templates select="cfd:Receptor"/>
-					<div class="center-txt">
-						<strong>Domicilio:</strong><br/>
-						<xsl:apply-templates select="cfd:Receptor/cfd:Domicilio"/>
-					</div>
-				</td>
-				<td class="box">
 					<table>
 						<tr>
-							<td class="h">FACTURA</td>
-							<td class="h"><xsl:value-of select="@folio"/></td>
+							<td class="h l">Serie</td>
+							<td class="h r"><xsl:value-of select="@serie"/></td>
 						</tr>
 						<tr>
-							<td class="h">Serie</td>
-							<td class="h"><xsl:value-of select="@serie"/></td>
+							<td class="h l">Folio</td>
+							<td class="h r"><xsl:value-of select="@folio"/></td>
 						</tr>
 						<tr>
 							<td class="l">Fecha-Hora</td>
@@ -96,9 +81,32 @@
 						</tr>
 					</table>
 				</td>
+				<td>
+					<div class="top">
+						<xsl:apply-templates select="cfd:Receptor"/>
+					</div>
+					<table class="box">
+						<tr>
+							<td class="l h">Subtotal</td>
+							<td class="r h">$<xsl:value-of select="php:function('_cfd_format_money', string(@subTotal))"/></td>
+						</tr>
+						<tr>
+							<td class="l h">Descuento global</td>
+							<td class="r h"><xsl:value-of select="php:function('_cfd_format_money', string(@descuento))"/></td>
+						</tr>
+						<tr>
+							<td class="l h"><xsl:value-of select="cfd:Impuestos/cfd:Traslados/cfd:Traslado/@impuesto"/><xsl:text> </xsl:text><xsl:value-of select="cfd:Impuestos/cfd:Traslados/cfd:Traslado/@tasa"/>%</td>
+							<td class="r h">$<xsl:value-of select="php:function('_cfd_format_money', string(cfd:Impuestos/@totalImpuestosTrasladados))"/></td>
+						</tr>
+						<tr style="font-size: 12pt">
+							<td class="l h">TOTAL</td>
+							<td class="r h">$<xsl:value-of select="php:function('_cfd_format_money', string(@total))"/></td>
+						</tr>
+					</table>
+				</td>
 			</tr>
 		</table>
-				<table cellspacing="0" cellpadding="2" border="1" nobr="true">
+		<table cellspacing="0" cellpadding="2" border="1" nobr="true">
 			<tr style="font-weight: bold;">
 				<th width="8%">Id.</th>
 				<th width="57%">Descripcion</th>
@@ -114,38 +122,9 @@
 					<td><xsl:value-of select="@cantidad"/></td>
 					<td><xsl:if test="@unidad"><xsl:value-of select="@unidad"/></xsl:if></td>
 					<td><xsl:value-of select="@valorUnitario"/></td>
-					<td><xsl:value-of select="@importe"/></td>
+					<td style="text-align:right;">$<xsl:value-of select="php:function('_cfd_format_money', string(@importe))"/></td>
 				</tr>
 			</xsl:for-each>
-		</table>
-		<span style="font-size: 6pt"><br/></span>
-		<table cellspacing="0" cellpadding="2">
-			<tr>
-				<td width="60%"  style="vertical-align:middle">
-					<br/><br/>
-					<strong><xsl:value-of select="@formaDePago"></xsl:value-of></strong>
-				</td>
-				<td width="40%">
-					<table class="box">
-						<tr>
-							<td class="l h">Subtotal</td>
-							<td class="r h"><xsl:value-of select="@subTotal"/></td>
-						</tr>
-						<tr>
-							<td class="l h">Descuento global</td>
-							<td class="r h"><xsl:value-of select="@descuento"/></td>
-						</tr>
-						<tr>
-							<td class="l h"><xsl:value-of select="cfd:Impuestos/cfd:Traslados/cfd:Traslado/@impuesto"/><xsl:text> </xsl:text><xsl:value-of select="cfd:Impuestos/cfd:Traslados/cfd:Traslado/@tasa"/>%</td>
-							<td class="r h"><xsl:value-of select="cfd:Impuestos/@totalImpuestosTrasladados"/></td>
-						</tr>
-						<tr style="font-size: 12pt">
-							<td class="l h">TOTAL</td>
-							<td class="r h"><xsl:value-of select="@total"/></td>
-						</tr>
-					</table>
-				</td>
-			</tr>
 		</table>
 	</xsl:template>
 

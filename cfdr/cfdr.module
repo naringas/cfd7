@@ -33,12 +33,12 @@ function cfdr_menu() {
     'page callback' => 'cfdr_view_single',
     'page arguments' => array(1),
   );
-  $menu['cfdr/%/validar'] = array(
+  $menu['cfdr/%/pdf'] = array(
     'type' => MENU_CALLBACK,
-    'title' => 'Download',
+    'title' => 'View CFD',
     'access callback' => 'user_access',
     'access arguments' => array('view any CFD'),
-    'page callback' => 'cfdr_validate_xml',
+    'page callback' => 'cfdr_download_pdf',
     'page arguments' => array(1),
   );
   //Admin menu
@@ -198,7 +198,7 @@ function cfdr_view_cfds() {
         $cfd->emisor_nombre,
         format_date($fecha->format(DATE_FORMAT_UNIX), 'custom', 'j M Y'),
         $cfd->receptor_rfc,
-        $cfd->importe,
+        array('data' => '$'._cfd_format_money($cfd->importe), 'style' => 'text-align:right;'),
         $cfd->nav_number,
       ),
       'no_striping' => TRUE,
@@ -419,12 +419,18 @@ function cfdr_view_single($cfd) {
   $xsl_content_file = drupal_get_path('module', 'cfd') . '/resources/cfd_html.xsl';
   $xsl_content = new DOMDocument(); $xsl_content->load($xsl_content_file);
   $xsl = new XSLTProcessor(); $xsl->importStylesheet($xsl_content);
+  $xsl->registerPHPFunctions('_cfd_format_money');
   $html_content = $xsl->transformToXml($doc);
+
   $r_array = array(
+    'validity' => array(
+      '#markup' => (cfd_validate_schema($cfd->xml_filename) ? 'xml: valido' : 'xml: invalido') . '<br/>sello: ' . cfd_validate_sello($cfd->xml_filename),
+    ),
     'content' => array(
       '#markup' => $html_content,
     ),
   );
+
   return drupal_render($r_array);
 }
 
@@ -436,7 +442,8 @@ function cfdr_view_single($cfd) {
 function cfdr_validity_image($status, $cfd_id) {
   switch ($status) {
     case NULL:
-      return l(theme('image', array('path'=>'misc/watchdog-warning.png', 'title'=>'Click para validar')), "cfdr/$cfd_id/validar", array('html' => TRUE));
+      return theme('image', array('path'=>'misc/watchdog-warning.png'));
+      // return l(theme('image', array('path'=>'misc/watchdog-warning.png', 'title'=>'Click para validar')), "cfdr/$cfd_id/validar", array('html' => TRUE));
       break;
     case TRUE:
       return theme('image', array('path'=>'misc/watchdog-ok.png'));
