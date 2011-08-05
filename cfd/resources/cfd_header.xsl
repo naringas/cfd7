@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform" xmlns:cfd="http://www.sat.gob.mx/cfd/2" xmlns:php="http://php.net/xsl">
+<xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform" xmlns:cfd="http://www.sat.gob.mx/cfd/2">
 <xsl:output method="html"/>
+	<xsl:param name="pageNumber"/>
 	<xsl:template match="/cfd:Comprobante">
 		<style type="text/css">
 			.top {
@@ -78,7 +79,7 @@
 						</tr>
 						<tr>
 							<td class="l">Página</td>
-							<td class="r"><xsl:value-of select="php:function('_cfd_get_page')"/></td>
+							<td class="r"><xsl:value-of select="$pageNumber"/></td>
 						</tr>
 					</table>
 				</td>

@@ -5,17 +5,13 @@
  */
 
 /*
- * Sets the page number in the Header (called with argument)
- * Returns the page number inside the XSL transform for header (cfd_header.xsl)
+ * Inserts ',' every three characters
  */
-function _cfd_get_page($param = NULL) {
-  static $n;
-  if (!isset($param)) {
-    return $n;
-  }
-  else {
-    $n = $param;
-  }
+function _cfd_format_money($value) {
+  $value_arr = explode('.', $value);
+  $value_arr[0] = strrev(wordwrap(strrev($value_arr[0]), 3, ',', TRUE));
+  $value_arr[1] = strlen($value_arr[1]) >= 2 ? $value_arr[1] : $value_arr[1] . '0';
+  return implode('.', $value_arr);
 }
 
 /**
@@ -36,10 +32,12 @@ function cfd_make_pdf($xml) {
     $doc->load($xml, LIBXML_NOWARNING);
   else
     $doc->loadXML($xml);
+
   //Content
   $xsl_content_file = drupal_get_path('module', 'cfd') . '/resources/cfd_content.xsl';
   $xsl_content = new DOMDocument(); $xsl_content->load($xsl_content_file);
   $xsl = new XSLTProcessor(); $xsl->importStylesheet($xsl_content);
+  $xsl->registerPHPFunctions('_cfd_format_money');
   $html_content = $xsl->transformToXml($doc);
   //"cadena original" or cado
   $xsl_cado_file = drupal_get_path('module', 'cfd') . '/resources/sat/cadenaoriginal_2_0.xslt';

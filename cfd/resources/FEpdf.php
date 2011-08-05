@@ -14,12 +14,10 @@ class FEpdf extends TCPDF {
     $xsl_header->load($xsl_header_file);
     $this->xsl = new XSLTProcessor();
     $this->xsl->importStylesheet($xsl_header);
-    $this->xsl->registerPHPFunctions('_cfd_get_page');
-
   }
 
   public function Header() {
-    _cfd_get_page($this->getPage());
+    $this->xsl->setParameter('', 'pageNumber', $this->getPage());
     $this->writeHTML($this->xsl->transformToXml($this->doc));
     $this->SetTopMargin($this->getY() - 3);
   }

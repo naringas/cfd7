@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform" xmlns:cfd="http://www.sat.gob.mx/cfd/2">
+<xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform" xmlns:cfd="http://www.sat.gob.mx/cfd/2" xmlns:php="http://php.net/xsl">
 	<xsl:output method="html"/>
 	<xsl:template match="/cfd:Comprobante">
 		<style type="text/css">
@@ -39,7 +39,7 @@
 					<td><xsl:value-of select="@cantidad"/></td>
 					<td><xsl:if test="@unidad"><xsl:value-of select="@unidad"/></xsl:if></td>
 					<td><xsl:value-of select="@valorUnitario"/></td>
-					<td><xsl:value-of select="@importe"/></td>
+					<td><xsl:value-of select="php:function('_cfd_format_money', string(@importe))"/></td>
 				</tr>
 			</xsl:for-each>
 		</table>
@@ -54,19 +54,19 @@
 					<table class="box">
 						<tr>
 							<td class="l h">Subtotal</td>
-							<td class="r h"><xsl:value-of select="@subTotal"/></td>
+							<td class="r h">$<xsl:value-of select="php:function('_cfd_format_money', string(@subTotal))"/></td>
 						</tr>
 						<tr>
 							<td class="l h">Descuento global</td>
-							<td class="r h"><xsl:value-of select="@descuento"/></td>
+							<td class="r h"><xsl:value-of select="php:function('_cfd_format_money', string(@descuento))"/></td>
 						</tr>
 						<tr>
 							<td class="l h"><xsl:value-of select="cfd:Impuestos/cfd:Traslados/cfd:Traslado/@impuesto"/><xsl:text> </xsl:text><xsl:value-of select="cfd:Impuestos/cfd:Traslados/cfd:Traslado/@tasa"/>%</td>
-							<td class="r h"><xsl:value-of select="cfd:Impuestos/@totalImpuestosTrasladados"/></td>
+							<td class="r h">$<xsl:value-of select="php:function('_cfd_format_money', string(cfd:Impuestos/@totalImpuestosTrasladados))"/></td>
 						</tr>
 						<tr style="font-size: 12pt">
 							<td class="l h">TOTAL</td>
-							<td class="r h"><xsl:value-of select="@total"/></td>
+							<td class="r h">$<xsl:value-of select="php:function('_cfd_format_money', string(@total))"/></td>
 						</tr>
 					</table>
 				</td>
