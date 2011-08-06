@@ -413,6 +413,7 @@ function cfdr_download_pdf($cfdr_id) {
  */
 function cfdr_view_single($cfd) {
   drupal_set_breadcrumb(array(l(t('Home'), ''), l('Ver CFDs', 'cfdr')));
+  drupal_set_title("$cfd->serie $cfd->folio" . ' - ' . l('PDF', "cfdr/$cfd->cfdr_id/pdf"), PASS_THROUGH);
 
   $doc = new DOMDocument();
   $doc->load($cfd->xml_filename, LIBXML_NOWARNING);
@@ -422,16 +423,29 @@ function cfdr_view_single($cfd) {
   $xsl->registerPHPFunctions('_cfd_format_money');
   $html_content = $xsl->transformToXml($doc);
 
-  $r_array = array(
-    'validity' => array(
-      '#markup' => (cfd_validate_schema($cfd->xml_filename) ? 'xml: valido' : 'xml: invalido') . '<br/>sello: ' . cfd_validate_sello($cfd->xml_filename),
+  $struct_valid = cfd_validate_schema($cfd->xml_filename);
+  $sello_valid = cfd_validate_sello($cfd->xml_filename);
+  $header = array('Estructura XML (parcial)', 'Sello');
+  $rows = array(
+    'data' => array(
+      array(
+        'data' => $struct_valid ? 'Valido' : 'Invalido',
+        'style' => 'color:black; background-color:' . ($struct_valid ? 'green' : 'red'),
+      ),
+      array(
+        'data' => $sello_valid,
+        'style' => 'color:black; text-transform:capitalize; background-color:' . ($sello_valid == 'indeterminado' ? 'yellow' : ($sello_valid == 'valido' ? 'green' : 'red')),
+      )
     ),
+  );
+  $r_array = array(
     'content' => array(
       '#markup' => $html_content,
     ),
   );
 
-  return drupal_render($r_array);
+  return theme('table', array('header' => $header, 'rows' => $rows)) .
+    drupal_render($r_array);
 }
 
 
