@@ -413,7 +413,7 @@ function cfdr_download_pdf($cfdr_id) {
  */
 function cfdr_view_single($cfd) {
   drupal_set_breadcrumb(array(l(t('Home'), ''), l('Ver CFDs', 'cfdr')));
-  drupal_set_title("$cfd->serie $cfd->folio" . ' - ' . l('PDF', "cfdr/$cfd->cfdr_id/pdf"), PASS_THROUGH);
+  drupal_set_title("$cfd->serie $cfd->folio" . ' - ' . /*l('PDF', "cfdr/$cfd->cfdr_id/pdf") . ' - ' . */l('xml', "cfdr/$cfd->cfdr_id/xml"), PASS_THROUGH);
 
   $doc = new DOMDocument();
   $doc->load($cfd->xml_filename, LIBXML_NOWARNING);

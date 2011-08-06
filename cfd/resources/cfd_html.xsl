@@ -95,8 +95,18 @@
 							<td class="r h"><xsl:value-of select="php:function('_cfd_format_money', string(@descuento))"/></td>
 						</tr>
 						<tr>
-							<td class="l h"><xsl:value-of select="cfd:Impuestos/cfd:Traslados/cfd:Traslado/@impuesto"/><xsl:text> </xsl:text><xsl:value-of select="cfd:Impuestos/cfd:Traslados/cfd:Traslado/@tasa"/>%</td>
-							<td class="r h">$<xsl:value-of select="php:function('_cfd_format_money', string(cfd:Impuestos/@totalImpuestosTrasladados))"/></td>
+							<td class="l h">
+								<xsl:value-of select="cfd:Impuestos/cfd:Traslados/cfd:Traslado/@impuesto"/>
+								<xsl:text> </xsl:text>
+								<xsl:if test="cfd:Impuestos/cfd:Traslados/cfd:Traslado/@tasa">
+									<xsl:value-of select="cfd:Impuestos/cfd:Traslados/cfd:Traslado/@tasa"/>%
+								</xsl:if>
+							</td>
+							<td class="r h">
+								<xsl:if test="cfd:Impuestos/@totalImpuestosTrasladados">
+									$<xsl:value-of select="php:function('_cfd_format_money', string(cfd:Impuestos/@totalImpuestosTrasladados))"/>
+								</xsl:if>
+							</td>
 						</tr>
 						<tr style="font-size: 12pt">
 							<td class="l h">TOTAL</td>
