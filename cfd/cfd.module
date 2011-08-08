@@ -4,16 +4,6 @@
  * Also contatins Schema validation funcitons
  */
 
-/*
- * Inserts ',' every three characters
- */
-function _cfd_format_money($value) {
-  $value_arr = explode('.', $value);
-  $value_arr[0] = strrev(wordwrap(strrev($value_arr[0]), 3, ',', TRUE));
-  // $value_arr[1] = strlen($value_arr[1]) >= 2 ? $value_arr[1] : $value_arr[1] . '0';
-  return implode('.', $value_arr);
-}
-
 /**
  * Makes a PDF based on 2 XSL Template files (located in resources/cfd_*.xsl)
  * one for header, one for content and also uses SAT provided file: cadenaoriginal_2_0.xslt
@@ -37,7 +27,7 @@ function cfd_make_pdf($xml) {
   $xsl_content_file = drupal_get_path('module', 'cfd') . '/resources/cfd_content.xsl';
   $xsl_content = new DOMDocument(); $xsl_content->load($xsl_content_file);
   $xsl = new XSLTProcessor(); $xsl->importStylesheet($xsl_content);
-  $xsl->registerPHPFunctions('_cfd_format_money');
+  $xsl->registerPHPFunctions('number_format');
   $html_content = $xsl->transformToXml($doc);
   //"cadena original" or cado
   $xsl_cado_file = drupal_get_path('module', 'cfd') . '/resources/sat/cadenaoriginal_2_0.xslt';

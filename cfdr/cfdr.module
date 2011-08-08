@@ -198,7 +198,7 @@ function cfdr_view_cfds() {
         $cfd->emisor_nombre,
         format_date($fecha->format(DATE_FORMAT_UNIX), 'custom', 'j M Y'),
         $cfd->receptor_rfc,
-        array('data' => '$'._cfd_format_money($cfd->importe), 'style' => 'text-align:right;'),
+        array('data' => '$' . number_format($cfd->importe, 2), 'style' => 'text-align:right;'),
         $cfd->nav_number,
       ),
       'no_striping' => TRUE,
@@ -420,7 +420,7 @@ function cfdr_view_single($cfd) {
   $xsl_content_file = drupal_get_path('module', 'cfd') . '/resources/cfd_html.xsl';
   $xsl_content = new DOMDocument(); $xsl_content->load($xsl_content_file);
   $xsl = new XSLTProcessor(); $xsl->importStylesheet($xsl_content);
-  $xsl->registerPHPFunctions('_cfd_format_money');
+  $xsl->registerPHPFunctions('number_format');
   $html_content = $xsl->transformToXml($doc);
 
   $struct_valid = cfd_validate_schema($cfd->xml_filename);

@@ -88,11 +88,11 @@
 					<table class="box">
 						<tr>
 							<td class="l h">Subtotal</td>
-							<td class="r h">$<xsl:value-of select="php:function('_cfd_format_money', string(@subTotal))"/></td>
+							<td class="r h">$<xsl:value-of select="php:function('number_format', number(@subTotal), 2)"/></td>
 						</tr>
 						<tr>
 							<td class="l h">Descuento global</td>
-							<td class="r h"><xsl:value-of select="php:function('_cfd_format_money', string(@descuento))"/></td>
+							<td class="r h"><xsl:value-of select="php:function('number_format', number(@descuento), 2)"/></td>
 						</tr>
 						<tr>
 							<td class="l h">
@@ -104,13 +104,13 @@
 							</td>
 							<td class="r h">
 								<xsl:if test="cfd:Impuestos/@totalImpuestosTrasladados">
-									$<xsl:value-of select="php:function('_cfd_format_money', string(cfd:Impuestos/@totalImpuestosTrasladados))"/>
+									$<xsl:value-of select="php:function('number_format', number(cfd:Impuestos/@totalImpuestosTrasladados), 2)"/>
 								</xsl:if>
 							</td>
 						</tr>
 						<tr style="font-size: 12pt">
 							<td class="l h">TOTAL</td>
-							<td class="r h">$<xsl:value-of select="php:function('_cfd_format_money', string(@total))"/></td>
+							<td class="r h">$<xsl:value-of select="php:function('number_format', number(@total), 2)"/></td>
 						</tr>
 					</table>
 				</td>
@@ -132,7 +132,7 @@
 					<td><xsl:value-of select="@cantidad"/></td>
 					<td><xsl:if test="@unidad"><xsl:value-of select="@unidad"/></xsl:if></td>
 					<td><xsl:value-of select="@valorUnitario"/></td>
-					<td style="text-align:right;">$<xsl:value-of select="php:function('_cfd_format_money', string(@importe))"/></td>
+					<td style="text-align:right;">$<xsl:value-of select="php:function('number_format', number(@importe) ,2)"/></td>
 				</tr>
 			</xsl:for-each>
 		</table>
