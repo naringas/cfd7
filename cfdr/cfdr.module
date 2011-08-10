@@ -147,7 +147,9 @@ function cfdr_view_cfds() {
   if (isset($filters)) {
     foreach ($filters as $filter => $value) {
       switch ($filter) {
-        default:
+        // default:
+        case 'receptor_rfc':
+        case 'serie':
           $or = db_or();
           foreach ($value as $v) {
             if ($v == NULL)
@@ -158,17 +160,35 @@ function cfdr_view_cfds() {
           $query->condition($or);
         break;
         case 'fecha_cfd':
-          $query->condition(db_and()->condition('fecha_cfd', $value['start'], '>=')->condition('fecha_cfd', $value['end'], '<='));
+          if (isset($value['start']) && isset($value['end']))
+            $query->condition(db_and()->condition('fecha_cfd', $value['start'], '>=')->condition('fecha_cfd', $value['end'], '<='));
+          else if (!isset($value['start']) && isset($value['end']))
+            $query->condition('fecha_cfd', $value['end'], '<=');
+          else if (isset($value['start']) && !isset($value['end']))
+            $query->condition('fecha_cfd', $value['start'], '>=');
         break;
         case 'emisor_nombre':
-          $query->condition($filter, '%%'.$value.'%%', 'LIKE');
+          $query->condition('emisor_nombre', '%%'.$value.'%%', 'LIKE');
+        break;
+        case 'valid':
+          switch ($value) {
+            case 1:
+              $query->condition('valid', TRUE);
+            break;
+            case 2:
+              $query->isNull('valid');
+            break;
+            case 3:
+              $query->condition('valid', FALSE);
+            break;
+          }
         break;
       }
     }
   }
 
   $header = array(
-    t('Valid'),
+    t('Status'),
     array('data' => 'Serie', 'field' => 'serie'),
     array('data' => 'Folio', 'field' => 'folio'),
     array('data' => t('Emisor'), 'field' => 'emisor_rfc'),
@@ -208,8 +228,8 @@ function cfdr_view_cfds() {
       'data' => array(
         // array('data' => 'Archivo', 'header' => TRUE),
         array('data' => 'Archivo -&gt;', 'style' =>'font-style:italic; font-weight: bolder;'),
-        array('data' => l(basename($cfd->xml_filename), "cfdr/{$cfd->cfdr_id}/xml"), 'colspan' => 6),
-        array('data' => l('Ver', "cfdr/{$cfd->cfdr_id}")),
+        array('data' => l($basename, "cfdr/{$cfd->cfdr_id}/xml", array('attributes'=>array('title'=>$cfd->xml_filename))), 'colspan' => 6 ),
+        array('data' => l(t('View'), "cfdr/{$cfd->cfdr_id}")),
       ),
       'no_striping' => TRUE,
       'class' => ($i++ % 2 == 0) ? 'even' : 'odd',
@@ -244,7 +264,7 @@ function cfdr_filters_form() {
     '#title' => 'Nombre emisor',
     '#size' => 50,
     '#maxlength' => 255,
-    '#default_value' => $_SESSION['cfdr_filters']['emisor_nombre']
+    '#default_value' => $_SESSION['cfdr_filters']['emisor_nombre'],
   );
   // RFCs
   // $form['filters']['emisor_rfc'] = array(
@@ -277,6 +297,17 @@ function cfdr_filters_form() {
     '#maxlength' => 10,
     '#description' => t('Format: yyyy-mm-dd'),
     '#default_value' => substr($_SESSION['cfdr_filters']['fecha_cfd']['end'], 0, 10),
+  );
+  $form['filters']['valid'] = array(
+    '#type' => 'radios',
+    '#title' => t('Status'),
+    '#default_value' => $_SESSION['cfdr_filters']['valid'],
+    '#options' => array(
+      t('All'),
+      theme('image', array('path'=>'misc/watchdog-ok.png')),
+      theme('image', array('path'=>'misc/watchdog-warning.png')),
+      theme('image', array('path'=>'misc/watchdog-error.png')),
+    ),
   );
   // Buttons
   $form['filters']['filter'] = array(
@@ -320,12 +351,15 @@ function cfdr_filters_form_submit($form, &$form_state) {
     $filters['fecha_cfd']['start'] = date_format($start, DATE_FORMAT_ISO);
   }
   if ($values['end']) {
-    // 86399 seconds = one day - 1 second
-    $end = date_create(date_format(date_create($values['end']), DATE_FORMAT_UNIX) + 86399, NULL, DATE_UNIX);
+    $end = date_create($values['end']);
+    $end->modify('+23 hours 59 minutes 59 seconds');
     $filters['fecha_cfd']['end'] = date_format($end, DATE_FORMAT_ISO);
   }
   if ($values['emisor_nombre']) {
     $filters['emisor_nombre'] = $values['emisor_nombre'];
+  }
+  if ($values['valid']) {
+    $filters['valid'] = $values['valid'];
   }
 }
 
@@ -352,14 +386,56 @@ function theme_cfdr_filters_fieldset($variables) {
   $output .= drupal_render($form['emisor_nombre']);
   $output .= '<div style="display: table-row;">';
     $output .= '<div style="display: table-cell; padding-right: 15px">' . drupal_render($form['serie']) . '</div>';
-    // $output .= '<div style="display: table-cell; padding-right: 15px">' . drupal_render($form['emisor_rfc']) . '</div>';
     $output .= '<div style="display: table-cell;">' . drupal_render($form['receptor_rfc']) . '</div>';
   $output .= '</div><div style="display: table-row;">';
     $output .= '<div style="display: table-cell; padding-right: 15px">' . drupal_render($form['fecha_cfd']['start']) . '</div>';
     $output .= '<div style="display: table-cell;">' . drupal_render($form['fecha_cfd']['end']) . '</div>';
   $output .= '</div>';
+  $output .= drupal_render($form['valid']);
   $output .= drupal_render($form['filter']) . drupal_render($form['reset']);
   return $output;
+}
+
+/*
+ * Visualize a single CFD in a HTML page
+ */
+function cfdr_view_single($cfd) {
+  drupal_set_breadcrumb(array(l(t('Home'), ''), l('Ver CFDs', 'cfdr')));
+  drupal_set_title("$cfd->serie $cfd->folio" . ' - ' . /*l('PDF', "cfdr/$cfd->cfdr_id/pdf") . ' - ' . */l('xml', "cfdr/$cfd->cfdr_id/xml"), PASS_THROUGH);
+
+  $doc = new DOMDocument();
+  $doc->load($cfd->xml_filename, LIBXML_NOWARNING);
+  $xsl_content_file = drupal_get_path('module', 'cfd') . '/resources/cfd_html.xsl';
+  $xsl_content = new DOMDocument(); $xsl_content->load($xsl_content_file);
+  $xsl = new XSLTProcessor(); $xsl->importStylesheet($xsl_content);
+  $xsl->registerPHPFunctions('number_format');
+  $html_content = $xsl->transformToXml($doc);
+
+  $struct_valid = cfd_validate_schema($cfd->xml_filename);
+  $sello_valid = cfd_validate_sello($cfd->xml_filename);
+  $header = array('Estructura XML (parcial)', 'Sello');
+  $rows = array(
+    array(
+      'data' => array(
+        array(
+          'data' => $struct_valid ? 'Valido' : 'Invalido',
+          'style' => 'color:white; font-weight:bold; text-align:center; background-color:' . ($struct_valid ? 'green' : 'red'),
+        ),
+        array(
+          'data' => $sello_valid,
+          'style' => 'color:white; font-weight:bold; text-align:center; text-transform:capitalize; background-color:' . ($sello_valid == 'indeterminado' ? 'yellow' : ($sello_valid == 'valido' ? 'green' : 'red')),
+        ),
+      ),
+    ),
+  );
+  $r_array = array(
+    'content' => array(
+      '#markup' => $html_content,
+    ),
+  );
+
+  return theme('table', array('header' => $header, 'rows' => $rows, 'attributes' => array('style' => 'width:100%;'))) .
+    drupal_render($r_array);
 }
 
 /**
@@ -375,7 +451,6 @@ function cfdr_download_xml($cfdr_id) {
   if (ob_get_level()) {
     ob_end_clean();
   }
-
 
   // Transfer file in 1024 byte chunks to save memory usage.
   if ($fd = fopen($filename, 'rb')) {
@@ -407,47 +482,6 @@ function cfdr_download_pdf($cfdr_id) {
   // $pdf->Output("$node->title.pdf");
   $pdf->Output();
 }
-
-/*
- * Visualize a single CFD in a HTML page
- */
-function cfdr_view_single($cfd) {
-  drupal_set_breadcrumb(array(l(t('Home'), ''), l('Ver CFDs', 'cfdr')));
-  drupal_set_title("$cfd->serie $cfd->folio" . ' - ' . /*l('PDF', "cfdr/$cfd->cfdr_id/pdf") . ' - ' . */l('xml', "cfdr/$cfd->cfdr_id/xml"), PASS_THROUGH);
-
-  $doc = new DOMDocument();
-  $doc->load($cfd->xml_filename, LIBXML_NOWARNING);
-  $xsl_content_file = drupal_get_path('module', 'cfd') . '/resources/cfd_html.xsl';
-  $xsl_content = new DOMDocument(); $xsl_content->load($xsl_content_file);
-  $xsl = new XSLTProcessor(); $xsl->importStylesheet($xsl_content);
-  $xsl->registerPHPFunctions('number_format');
-  $html_content = $xsl->transformToXml($doc);
-
-  $struct_valid = cfd_validate_schema($cfd->xml_filename);
-  $sello_valid = cfd_validate_sello($cfd->xml_filename);
-  $header = array('Estructura XML (parcial)', 'Sello');
-  $rows = array(
-    'data' => array(
-      array(
-        'data' => $struct_valid ? 'Valido' : 'Invalido',
-        'style' => 'color:black; background-color:' . ($struct_valid ? 'green' : 'red'),
-      ),
-      array(
-        'data' => $sello_valid,
-        'style' => 'color:black; text-transform:capitalize; background-color:' . ($sello_valid == 'indeterminado' ? 'yellow' : ($sello_valid == 'valido' ? 'green' : 'red')),
-      )
-    ),
-  );
-  $r_array = array(
-    'content' => array(
-      '#markup' => $html_content,
-    ),
-  );
-
-  return theme('table', array('header' => $header, 'rows' => $rows)) .
-    drupal_render($r_array);
-}
-
 
 /**
  * Get the appropriate image for valid, invalid, and to be determined CFD validity
