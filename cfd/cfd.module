@@ -138,6 +138,7 @@ function cfd_validate_sello($xml) {
 
   $xpath = new DOMXPath($doc);
   $xpath->registerNamespace('cfd', 'http://www.sat.gob.mx/cfd/2');
+  $year = substr($xpath->query('/cfd:Comprobante/@fecha')->item(0)->value, 0, 4);
   $certificado = $xpath->query('/cfd:Comprobante/@certificado');
   $sello = $xpath->query('/cfd:Comprobante/@sello')->item(0)->value;
 
@@ -149,7 +150,11 @@ function cfd_validate_sello($xml) {
     $pub_cer .= "\r\n-----END CERTIFICATE-----";
     $pub_key = openssl_pkey_get_public($pub_cer);
 
-    $v = openssl_verify($cadena_original, base64_decode($sello), $pub_key);
+    if ($year <= 2010)
+      $v = openssl_verify($cadena_original, base64_decode($sello), $pub_key, OPENSSL_ALGO_MD5);
+    else
+      $v = openssl_verify($cadena_original, base64_decode($sello), $pub_key, OPENSSL_ALGO_SHA1);
+
     if ($v == 1) {
       return 'valido';
     }
