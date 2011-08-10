@@ -39,7 +39,7 @@
 					<td><xsl:value-of select="@cantidad"/></td>
 					<td><xsl:if test="@unidad"><xsl:value-of select="@unidad"/></xsl:if></td>
 					<td><xsl:value-of select="@valorUnitario"/></td>
-					<td><xsl:value-of select="php:function('_cfd_format_money', string(@importe))"/></td>
+					<td><xsl:value-of select="php:function('number_format', number(@importe), 2)"/></td>
 				</tr>
 			</xsl:for-each>
 		</table>
@@ -54,19 +54,33 @@
 					<table class="box">
 						<tr>
 							<td class="l h">Subtotal</td>
-							<td class="r h">$<xsl:value-of select="php:function('_cfd_format_money', string(@subTotal))"/></td>
+							<td class="r h">$<xsl:value-of select="php:function('number_format', number(@subTotal), 2)"/></td>
 						</tr>
 						<tr>
 							<td class="l h">Descuento global</td>
-							<td class="r h"><xsl:value-of select="php:function('_cfd_format_money', string(@descuento))"/></td>
+							<td class="r h">
+								<xsl:if test="@descuento">
+									$<xsl:value-of select="php:function('number_format', number(@descuento), 2)"/>
+								</xsl:if>
+							</td>
 						</tr>
 						<tr>
-							<td class="l h"><xsl:value-of select="cfd:Impuestos/cfd:Traslados/cfd:Traslado/@impuesto"/><xsl:text> </xsl:text><xsl:value-of select="cfd:Impuestos/cfd:Traslados/cfd:Traslado/@tasa"/>%</td>
-							<td class="r h">$<xsl:value-of select="php:function('_cfd_format_money', string(cfd:Impuestos/@totalImpuestosTrasladados))"/></td>
+							<td class="l h">
+								<xsl:value-of select="cfd:Impuestos/cfd:Traslados/cfd:Traslado/@impuesto"/>
+								<xsl:text> </xsl:text>
+								<xsl:if test="cfd:Impuestos/cfd:Traslados/cfd:Traslado/@tasa">
+									<xsl:value-of select="cfd:Impuestos/cfd:Traslados/cfd:Traslado/@tasa"/>%
+								</xsl:if>
+							</td>
+							<td class="r h">
+								<xsl:if test="cfd:Impuestos/@totalImpuestosTrasladados">
+									$<xsl:value-of select="php:function('number_format', number(cfd:Impuestos/@totalImpuestosTrasladados), 2)"/>
+								</xsl:if>
+							</td>
 						</tr>
 						<tr style="font-size: 12pt">
 							<td class="l h">TOTAL</td>
-							<td class="r h">$<xsl:value-of select="php:function('_cfd_format_money', string(@total))"/></td>
+							<td class="r h">$<xsl:value-of select="php:function('number_format', number(@total), 2)"/></td>
 						</tr>
 					</table>
 				</td>

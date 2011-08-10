@@ -92,7 +92,11 @@
 						</tr>
 						<tr>
 							<td class="l h">Descuento global</td>
-							<td class="r h"><xsl:value-of select="php:function('number_format', number(@descuento), 2)"/></td>
+							<td class="r h">
+								<xsl:if test="@descuento">
+									$<xsl:value-of select="php:function('number_format', number(@descuento), 2)"/>
+								</xsl:if>
+							</td>
 						</tr>
 						<tr>
 							<td class="l h">
