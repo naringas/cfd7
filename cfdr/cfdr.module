@@ -62,6 +62,9 @@ function cfdr_theme() {
     'cfdr_filters_fieldset' => array(
       'render element' => 'form'
     ),
+    'cfdr_view_single_fieldset_form' => array(
+      'render element' => 'form'
+    ),
   );
 }
 
@@ -319,8 +322,6 @@ function cfdr_filters_form() {
     '#value' => t('Reset'),
   );
   $form['filters']['#theme'] = 'cfdr_filters_fieldset';
-  // $form['#redirect'] = 'cfdr';
-  // $form['#validate'][] = 'cfdr_filters_form_validate';
   $form['#submit'][] = 'cfdr_filters_form_submit';
   return $form;
 }
@@ -413,17 +414,46 @@ function cfdr_view_single($cfd) {
 
   $struct_valid = cfd_validate_schema($cfd->xml_filename);
   $sello_valid = cfd_validate_sello($cfd->xml_filename);
-  $header = array('Estructura XML (parcial)', 'Sello');
+  $header = array(
+    array('data' => 'Estructura XML (parcial)', 'colspan' => 2,),
+    array('data' => 'Sello', 'colspan' => 2,),
+  );
   $rows = array(
     array(
+      'no_striping' => TRUE,
       'data' => array(
         array(
           'data' => $struct_valid ? 'Valido' : 'Invalido',
           'style' => 'color:white; font-weight:bold; text-align:center; background-color:' . ($struct_valid ? 'green' : 'red'),
+          'colspan' => 2,
         ),
         array(
           'data' => $sello_valid,
           'style' => 'color:white; font-weight:bold; text-align:center; text-transform:capitalize; background-color:' . ($sello_valid == 'indeterminado' ? 'yellow' : ($sello_valid == 'valido' ? 'green' : 'red')),
+          'colspan' => 2,
+        ),
+      ),
+    ),
+    array(
+      'no_striping' => TRUE,
+      'data' => array(
+        array(
+          'data' => 'Status',
+          'header' => TRUE,
+          'style' => 'width: 25%;',
+        ),
+        array(
+          'data' => cfdr_validity_image($cfd->valid, $cfd->cfdr_id),
+          'style' => 'width: 25%;',
+        ),
+        array(
+          'data' => 'NAV FC-',
+          'header' => TRUE,
+          'style' => 'width: 25%;',
+        ),
+        array(
+          'data' => $cfd->nav_number,
+          'style' => 'width: 25%;',
         ),
       ),
     ),
@@ -435,7 +465,113 @@ function cfdr_view_single($cfd) {
   );
 
   return theme('table', array('header' => $header, 'rows' => $rows, 'attributes' => array('style' => 'width:100%;'))) .
+    drupal_render(drupal_get_form('cfdr_view_single_form', &$cfd)) .
     drupal_render($r_array);
+}
+
+/**
+ * CFD status (valid) and nav_number edit form
+ */
+function cfdr_view_single_form($form, &$form_state, $cfd) {
+  $form['efield'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Edit'),
+    '#collapsible' => TRUE,
+    '#collapsed' => TRUE,
+  );
+  $form['efield']['cfd_id'] = array(
+    '#type' => 'hidden',
+    '#value' => $cfd->cfdr_id,
+  );
+
+  $form['efield']['valid'] = array(
+    '#type' => 'radios',
+    '#title' => t('Status'),
+    '#default_value' => _cfdr_valid2option($cfd->valid),
+    '#options' => array(
+      theme('image', array('path'=>'misc/watchdog-ok.png')),
+      theme('image', array('path'=>'misc/watchdog-warning.png')),
+      theme('image', array('path'=>'misc/watchdog-error.png')),
+    ),
+  );
+  $form['efield']['nav_number'] = array(
+    '#type' => 'textfield',
+    '#title' => 'NAV FC-',
+    '#default_value' => $cfd->nav_number,
+  );
+  // Buttons
+  $form['efield']['update'] = array(
+    '#type' => 'submit',
+    '#value' => t('Update'),
+  );
+  $form['efield']['#theme'] = 'cfdr_view_single_fieldset_form';
+  $form['#submit'][] = 'cfdr_view_single_form_submit';
+  return $form;
+}
+
+function cfdr_view_single_form_submit($form, &$form_state) {
+  // dpm($form, 'form');
+  // dpm($form_state, 'state');
+  $cfd_id = $form_state['values']['cfd_id'];
+  $valid = $form_state['values']['valid'];
+  $nav_number = $form_state['values']['nav_number'];
+
+  if (strlen($nav_number) == 0) unset($nav_number);
+  // turn valid from option value to DB value
+  switch ($valid) {
+    case 0:
+      $valid = 1; //TRUE
+    break;
+    case 1:
+      unset($valid); //NULL
+    break;
+    case 2:
+      $valid = 0; //FALSE
+    break;
+  }
+  $update = array(
+    'cfdr_id' => $cfd_id,
+    'valid' => $valid,
+    'nav_number' => $nav_number,
+  );
+  // dpm($update, 'updt');
+  drupal_write_record('cfdr', $update, 'cfdr_id');
+
+}
+/**
+ * from DB value to option value
+ * @return $valid as an option:
+ *  0-FALSE into 2
+ *  1-TRUE into 0
+ *  NULL into 1
+ */
+function _cfdr_valid2option($valid) {
+  if (isset($valid)) {
+    switch ($valid) {
+    case FALSE:
+      $valid = 2; //TRUE
+    break;
+    case TRUE:
+      $valid = 0; //FALSE
+    break;
+    }
+  } else
+    $valid = 1;
+
+  return $valid;
+}
+
+/**
+ * Theme for cfdr_view_single_form fieldset
+ */
+function theme_cfdr_view_single_fieldset_form($variables) {
+  $form = $variables['form'];
+  $output = '<table><tr style="background-color: white;">';
+    $output .= '<td>' . drupal_render($form['valid']) . '</td>';
+    $output .= '<td>' . drupal_render($form['nav_number']) . '</td>';
+  $output .= '</tr></table>';
+  $output .= drupal_render($form['update']);
+  return $output;
 }
 
 /**
