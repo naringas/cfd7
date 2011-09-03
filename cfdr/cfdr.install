@@ -49,7 +49,8 @@ function cfdr_schema() {
         'description' => "Receiving party's RFC",
       ),
       'fecha_cfd' => array(
-        'mysql_type' => 'DATETIME',
+        'type' => 'datetime',
+        // 'mysql_type' => 'DATETIME',
         'not null' => FALSE,
         'description' => 'Date of the CFD',
       ),
@@ -72,12 +73,18 @@ function cfdr_schema() {
         'size' => 'tiny',
         'unsigned' => 'true',
         'not null' => FALSE,
-        'description' => 'Stores the validity of the CFD. NULL means it is not validated yet',
+        'description' => 'Stores the validity (status) of the CFD. NULL means it is not validated yet',
       ),
       'nav_number' => array(
         'type' => 'int',
         'size' => 'normal',
         'not null' => FALSE,
+      ),
+      'xml_type' => array(
+        'type' => 'int',
+        'size' => 'tiny',
+        'unsigned' => 'true',
+        'not null' => TRUE,
       ),
     ),
     'primary key' => array('cfdr_id'),
@@ -89,4 +96,17 @@ function cfdr_schema() {
     ),
   );
   return $schema;
+}
+
+/**
+ * adds 'xml_type' field
+ */
+function cfdr_update_7001() {
+  db_add_field('cfdr', 'xml_type', array(
+    'type' => 'int',
+    'size' => 'tiny',
+    'unsigned' => 'true',
+    'not null' => TRUE,
+    'initial' => 0, // 0 is TYPE_CFD
+  ));
 }

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform" xmlns:cfd="http://www.sat.gob.mx/cfd/2" xmlns:php="http://php.net/xsl">
+<xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform" xmlns:cfdi="http://www.sat.gob.mx/cfd/3" xmlns:php="http://php.net/xsl">
 <xsl:output method="html"/>
-	<xsl:template match="/cfd:Comprobante">
+	<xsl:template match="/cfdi:Comprobante">
 		<style type="text/css">
 			.top {
 				text-align: center;
@@ -44,12 +44,12 @@
 			.box {
 			}
 		</style>
-		<div class="top" style="text-decoration: underline; 	text-align: center;"><xsl:text>CFD</xsl:text></div>
+		<div class="top" style="text-decoration: underline; 	text-align: center;"><xsl:text>CFDI</xsl:text></div>
 		<table cellpadding="4" cellspacing="3">
 			<tr>
 				<th colspan="2">
 					<div class="top">
-						<xsl:apply-templates select="cfd:Emisor"/>
+						<xsl:apply-templates select="cfdi:Emisor"/>
 					</div>
 				</th>
 			</tr>
@@ -84,7 +84,7 @@
 				</td>
 				<td>
 					<div class="top">
-						<xsl:apply-templates select="cfd:Receptor"/>
+						<xsl:apply-templates select="cfdi:Receptor"/>
 					</div>
 					<table class="box">
 						<tr>
@@ -101,15 +101,15 @@
 						</tr>
 						<tr>
 							<td class="l h">
-								<xsl:value-of select="cfd:Impuestos/cfd:Traslados/cfd:Traslado/@impuesto"/>
+								<xsl:value-of select="cfdi:Impuestos/cfdi:Traslados/cfdi:Traslado/@impuesto"/>
 								<xsl:text> </xsl:text>
-								<xsl:if test="cfd:Impuestos/cfd:Traslados/cfd:Traslado/@tasa">
-									<xsl:value-of select="cfd:Impuestos/cfd:Traslados/cfd:Traslado/@tasa"/>%
+								<xsl:if test="cfdi:Impuestos/cfdi:Traslados/cfdi:Traslado/@tasa">
+									<xsl:value-of select="cfdi:Impuestos/cfdi:Traslados/cfdi:Traslado/@tasa"/>%
 								</xsl:if>
 							</td>
 							<td class="r h">
-								<xsl:if test="cfd:Impuestos/@totalImpuestosTrasladados">
-									$<xsl:value-of select="php:function('number_format', number(cfd:Impuestos/@totalImpuestosTrasladados), 2)"/>
+								<xsl:if test="cfdi:Impuestos/@totalImpuestosTrasladados">
+									$<xsl:value-of select="php:function('number_format', number(cfdi:Impuestos/@totalImpuestosTrasladados), 2)"/>
 								</xsl:if>
 							</td>
 						</tr>
@@ -130,7 +130,7 @@
 				<th width="8%">Valor Unitario</th>
 				<th width="10%">Importe</th>
 			</tr>
-			<xsl:for-each select="cfd:Conceptos/cfd:Concepto">
+			<xsl:for-each select="cfdi:Conceptos/cfdi:Concepto">
 				<tr>
 					<td><xsl:if test="@noIdentificacion"><xsl:value-of select="@noIdentificacion"/></xsl:if></td>
 					<td style="text-align: left"><xsl:value-of select="@descripcion"/></td>
@@ -144,7 +144,7 @@
 	</xsl:template>
 
 	<!--Direccion-->
-	<xsl:template match="cfd:DomicilioFiscal|cfd:ExpedidoEn|cfd:Domicilio">
+	<xsl:template match="cfdi:DomicilioFiscal|cfdi:ExpedidoEn|cfdi:Domicilio">
 		<xsl:if test="@calle"><xsl:value-of select="@calle"/></xsl:if>
 		<xsl:if test="@noExterior"><xsl:text> Núm. </xsl:text><xsl:value-of select="@noExterior"/></xsl:if>
 		<br/>
@@ -161,7 +161,7 @@
 	</xsl:template>
 
 	<!--Nombre y RFC-->
-	<xsl:template match="cfd:Emisor|cfd:Receptor">
+	<xsl:template match="cfdi:Emisor|cfdi:Receptor">
 		<xsl:if test="@nombre"><xsl:value-of select="@nombre"/></xsl:if>
 		<br/>
 		<strong>RFC: </strong><xsl:value-of select="@rfc"/>

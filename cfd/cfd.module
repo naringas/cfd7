@@ -111,7 +111,11 @@ function cfd_validate_schema($xml) {
     $doc_el->removeChild($complemento);
   }
 
-  $schemaFileName = drupal_get_path('module', 'cfd') . '/resources/sat/cfdv2.xsd';
+  if ($doc->isDefaultNamespace('http://www.sat.gob.mx/cfd/2'))
+    $schemaFileName = drupal_get_path('module', 'cfd') . '/resources/sat/cfdv2.xsd';
+  else if ($doc->lookupPrefix('http://www.sat.gob.mx/cfd/3') == 'cfdi')
+    $schemaFileName = drupal_get_path('module', 'cfd') . '/resources/sat/cfdv3.xsd';
+
   $validcfd = @$doc->schemaValidate($schemaFileName);
   return $validcfd;
 }
@@ -129,18 +133,26 @@ function cfd_validate_sello($xml) {
   else
     $doc->loadXML($xml);
 
-  $xsl_content_file = drupal_get_path('module', 'cfd') . '/resources/sat/cadenaoriginal_2_0.xslt';
   $xsl_content = new DOMDocument();
-  $xsl_content->load($xsl_content_file, LIBXML_NOWARNING);
-
-  $xsl = new XSLTProcessor(); @$xsl->importStylesheet($xsl_content);
-  $cadena_original = $xsl->transformToXml($doc);
-
   $xpath = new DOMXPath($doc);
-  $xpath->registerNamespace('cfd', 'http://www.sat.gob.mx/cfd/2');
+  if ($doc->isDefaultNamespace('http://www.sat.gob.mx/cfd/2')) {
+    // for CFD
+    $xsl_content_file = drupal_get_path('module', 'cfd') . '/resources/sat/cadenaoriginal_2_0.xslt';
+    $xpath->registerNamespace('cfd', 'http://www.sat.gob.mx/cfd/2');
+  }
+  else if ($doc->lookupPrefix('http://www.sat.gob.mx/cfd/3') == 'cfdi') {
+    // for CFDI
+    $xsl_content_file = drupal_get_path('module', 'cfd') . '/resources/sat/cadenaoriginal_3_0.xslt';
+    $xpath->registerNamespace('cfd', 'http://www.sat.gob.mx/cfd/3');
+  }
+
   $year = substr($xpath->query('/cfd:Comprobante/@fecha')->item(0)->value, 0, 4);
   $certificado = $xpath->query('/cfd:Comprobante/@certificado');
   $sello = $xpath->query('/cfd:Comprobante/@sello')->item(0)->value;
+  $xsl_content->load($xsl_content_file, LIBXML_NOWARNING);
+  $xsl = new XSLTProcessor(); @$xsl->importStylesheet($xsl_content);
+  $cadena_original = $xsl->transformToXml($doc);
+
 
   // Since @certificado is optional in a CFD
   if($certificado->length) {

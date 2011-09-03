@@ -3,6 +3,9 @@
  * @file Main module file
  */
 
+ define('TYPE_CFD' , 0);
+ define('TYPE_CFDI', 1);
+
 /**
  * Implementation of hook_menu().
  */
@@ -92,26 +95,34 @@ function cfdr_save(&$cfdr) {
 }
 
 /**
- * Loads then inserts a CFD into de database.
+ * Loads then reads, then inserts a CFD into de database.
  * @param string $cfdr_filename the full path and name of the CFD's .xml file
  **/
 function cfdr_insert($filename) {
   //parse XML file read (with xml DOM(simpleXML sucks at namespaces))
   $doc = new DOMDocument();
   @$doc->load($filename, LIBXML_NOWARNING);
+  // if we're dealing with CFD (and not CFDi)
   $xpath = new DOMXPath($doc);
-  $xpath->registerNamespace('cfd', 'http://www.sat.gob.mx/cfd/2');
+  $cfdr = new stdClass();
+  if ($doc->isDefaultNamespace('http://www.sat.gob.mx/cfd/2')) {
+    $xpath->registerNamespace('cfd', 'http://www.sat.gob.mx/cfd/2');
+    $cfdr->xml_type = TYPE_CFD;
+  }
+  else if ($doc->lookupPrefix('http://www.sat.gob.mx/cfd/3') == 'cfdi') {
+    $xpath->registerNamespace('cfd', 'http://www.sat.gob.mx/cfd/3');
+    $cfdr->xml_type = TYPE_CFDI;
+  }
+  // abort if not on a CFD or CFDI
+  $fecha_cfd = $xpath->query('/cfd:Comprobante/@fecha');
+  if (!$fecha_cfd->length) return FALSE;
   $serie = $xpath->query('/cfd:Comprobante/@serie');
   $folio = $xpath->query('/cfd:Comprobante/@folio');
-  // abort if not on a CFD
-  if (!$folio->length) return FALSE;
   $receptor_rfc = $xpath->query('/cfd:Comprobante/cfd:Receptor/@rfc');
   $emisor_rfc = $xpath->query('/cfd:Comprobante/cfd:Emisor/@rfc');
   $emisor_nombre = $xpath->query('/cfd:Comprobante/cfd:Emisor/@nombre');
-  $fecha_cfd = $xpath->query('/cfd:Comprobante/@fecha');
   $importe = $xpath->query('/cfd:Comprobante/@total');
 
-  $cfdr = new stdClass();
   $cfdr->serie = $serie->item(0)->value;
   $cfdr->folio = $folio->item(0)->value;
   $cfdr->receptor_rfc = $receptor_rfc->item(0)->value;
@@ -387,7 +398,8 @@ function theme_cfdr_filters_fieldset($variables) {
   $output .= drupal_render($form['emisor_nombre']);
   $output .= '<div style="display: table-row;">';
     $output .= '<div style="display: table-cell; padding-right: 15px">' . drupal_render($form['serie']) . '</div>';
-    $output .= '<div style="display: table-cell;">' . drupal_render($form['receptor_rfc']) . '</div>';
+    $output .= '<div style="display: table-cell; padding-right: 30px">' . drupal_render($form['receptor_rfc']) . '</div>';
+    $output .= '<div style="display: table-cell;">' . drupal_render($form['valid']) . '</div>';
   $output .= '</div><div style="display: table-row;">';
     $output .= '<div style="display: table-cell; padding-right: 15px">' . drupal_render($form['fecha_cfd']['start']) . '</div>';
     $output .= '<div style="display: table-cell;">' . drupal_render($form['fecha_cfd']['end']) . '</div>';
@@ -406,7 +418,13 @@ function cfdr_view_single($cfd) {
 
   $doc = new DOMDocument();
   $doc->load($cfd->xml_filename, LIBXML_NOWARNING);
-  $xsl_content_file = drupal_get_path('module', 'cfd') . '/resources/cfd_html.xsl';
+  //chosse XSL file for CFD or CFDI
+  if ($cfd->xml_type == TYPE_CFD)
+    $xsl_content_file = drupal_get_path('module', 'cfd') . '/resources/cfd_html.xsl';
+
+  elseif ($cfd->xml_type == TYPE_CFDI)
+    $xsl_content_file = drupal_get_path('module', 'cfd') . '/resources/cfdi_html.xsl';
+
   $xsl_content = new DOMDocument(); $xsl_content->load($xsl_content_file);
   $xsl = new XSLTProcessor(); $xsl->importStylesheet($xsl_content);
   $xsl->registerPHPFunctions('number_format');
