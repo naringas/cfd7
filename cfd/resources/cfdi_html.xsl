@@ -44,7 +44,10 @@
 			.box {
 			}
 		</style>
-		<div class="top" style="text-decoration: underline; 	text-align: center;"><xsl:text>CFDI</xsl:text></div>
+		<div class="top" style="text-decoration: underline; 	text-align: center;">
+			<xsl:text>CFDI - </xsl:text>
+			<xsl:value-of select="@tipoDeComprobante" />
+		</div>
 		<table cellpadding="4" cellspacing="3">
 			<tr>
 				<th colspan="2">
