@@ -197,6 +197,8 @@ function cfdr_view_cfds() {
             break;
           }
         break;
+        case 'navfc':
+          $query->condition('nav_number', $value);
       }
     }
   }
@@ -272,6 +274,7 @@ function cfdr_filters_form() {
     '#default_value' => @array_keys($_SESSION['cfdr_filters']['serie']),
     '#options' => _cfdr_get_select('serie'),
     '#multiple' => TRUE,
+    '#size' => 10,
   );
   $form['filters']['emisor_nombre'] = array(
     '#type' => 'textfield',
@@ -323,6 +326,13 @@ function cfdr_filters_form() {
       theme('image', array('path'=>'misc/watchdog-error.png')),
     ),
   );
+  $form['filters']['navfc'] = array(
+    '#type' => 'textfield',
+    '#title' => 'NAV FC',
+    '#size' => 15,
+    '#maxlength' => 11,
+    '#default_value' => $_SESSION['cfdr_filters']['navfc'],
+  );
   // Buttons
   $form['filters']['filter'] = array(
     '#type' => 'submit',
@@ -373,6 +383,9 @@ function cfdr_filters_form_submit($form, &$form_state) {
   if ($values['valid']) {
     $filters['valid'] = $values['valid'];
   }
+  if ($values['navfc']) {
+    $filters['navfc'] = $values['navfc'];
+  }
 }
 
 /**
@@ -395,9 +408,11 @@ function _cfdr_get_select($field) {
 function theme_cfdr_filters_fieldset($variables) {
   $form = $variables['form'];
   $output = '';
-  $output .= drupal_render($form['emisor_nombre']);
-  $output .= '<div style="display: table-row;">';
-    $output .= '<div style="display: table-cell; padding-right: 15px">' . drupal_render($form['serie']) . '</div>';
+  $output .= '<div style="display: inline-block;">';
+    $output .= '<div style="display: inline-block; padding-right: 15px">' . drupal_render($form['emisor_nombre']) . '</div>';
+    $output .= '<div style="display: inline-block;">' . drupal_render($form['navfc']) . '</div>';
+  $output .= '</div><div style="display: table-row;">';
+    $output .= '<div style="display: table-cell;">' . drupal_render($form['serie']) . '</div>';
     $output .= '<div style="display: table-cell; padding-right: 30px">' . drupal_render($form['receptor_rfc']) . '</div>';
     $output .= '<div style="display: table-cell;">' . drupal_render($form['valid']) . '</div>';
   $output .= '</div><div style="display: table-row;">';
