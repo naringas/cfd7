@@ -1,0 +1,108 @@
+<?php
+/**
+ * @file
+ * Install, update and uninstall functions for the cfd module.
+ * Adds two tables which are filled by the outside script in the script/ directory
+ */ 
+ 
+/**
+ * Implementation of hook_schema().
+ */
+function cfd_schema() {
+  $schema['cfd_certs'] = array(
+    'description' => 'Stores SAT information about certificate validity',
+    'fields' => array(
+      'no_serie' => array(
+        'type' => 'int',
+        'size' => 'PDF_begin_glyph(pdfdoc, glyphname, wx, llx, lly, urx, ury)',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'description' => 'noCertificado attribute of a CFD',
+      ),
+      'fecha_inicial_cert' => array(
+        'mysql_type' => 'DATETIME',
+        'pgsql_type' => 'timestamp without time zone',
+        'not null' => TRUE,
+        'description' => "certificate's start date",
+      ),
+      'fecha_final_cert' => array(
+        'mysql_type' => 'DATETIME',
+        'pgsql_type' => 'timestamp without time zone',
+        'not null' => TRUE,
+        'description' => "certificate's end date",
+      ),
+      'RFC' => array(
+        'type' => 'varchar',
+        'length' => '13',
+        'not null' => TRUE,
+        'description' => 'RFC of whom emits the CFD',
+      ),
+      'edo_cert' => array(
+        'type' => 'varchar',
+        'length' => '1',
+        'not null' => TRUE,
+        'description' => 'Certificate status: A - approved. R - ?. C - ?',
+      ),
+    ),
+    'primary key' => array('no_serie'),
+    'indexes' => array(
+      'RFC' => array('RFC'),
+    )
+  );
+  $schema['cfd_folios'] = array(
+    'description' => 'Stores SAT information about folio validity',
+    'fields' => array(
+      'RFC' => array(
+        'type' => 'varchar',
+        'length' => '13',
+        'not null' => TRUE,
+        'description' => "RFC of whom emits the CFD",
+      ),
+      'noAprobacion' => array(
+        'type' => 'int',
+        'size' => 'normal',
+        'unsinged' => TRUE,
+        'not null' => TRUE,
+        'description' => 'noAprobacion attribute of a CFD',
+      ),
+      'anoAprobacion' => array(
+        'type' => 'int',
+        'size' => 'small',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'description' => "folio approval year",
+      ),
+      'Serie' => array(
+        'type' => 'varchar',
+        'length' => '10',
+        'not null' => TRUE,
+        'default' => '',
+        'description' => "cfd's series (letters)",      
+      ),
+      'FolioInicial' => array(
+        'type' => 'int',
+        'size' => 'normal',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'description' => "cfd's number start",
+      ),
+      'FolioFinal' => array(
+        'type' => 'int',
+        'size' => 'normal',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'description' => "cfd's number end",
+      ),
+    ),
+    // 'primary key' => array('noAprobacion', 'anoAprobacion'),
+    'indexes' => array(
+      'RFC' => array('RFC'),
+      'aprobacion' => array('noAprobacion', 'anoAprobacion'),
+    )
+  );
+  return $schema;
+}
+
+function cfd_update_7001() {
+  
+}
