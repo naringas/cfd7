@@ -71,9 +71,8 @@ def main():
 	# OPTIONS
 	parser = OptionParser("python sat_import_certs [options]")
 	parser.add_option('--init', action='store_true', dest='init', default=False,
-		help='Vacia las tablas e importa (--no-ftp o --force-dl implican esto).')
-	parser.add_option('-v', '--verbose', action='store_true', dest='verbose', default=False,
-		help='Modo callado/silencioso. Tambien evita las preguntas.')
+		help='Vacia las tablas e importa.')
+	parser.add_option('-v', '--verbose', action='store_true', dest='verbose', default=False)
 	(options, args) = parser.parse_args()
 
 	# PROGRAM
@@ -135,8 +134,11 @@ def main():
 
 	# -----pre-SQL-----
 	# make SQL statement
+	# diff_filename is also used to indicates if a diff file was made; so that SQL gets executed everytime it was
+	diff_filename = None
 	if os.access(old_filename, os.F_OK) and not options.init:
-		import_filename = make_diff(old_filename, new_filename)
+		diff_filename = make_diff(old_filename, filename)
+		import_filename = diff_filename
 		ignore_lines = 3
 		start_by = " STARTING BY '+' "
 		replace = ' REPLACE '
@@ -150,8 +152,8 @@ def main():
 
 	newlines = get_newlines(import_filename)
 	import_filename = os.path.abspath(import_filename).replace('\\', r'\\')
-	import_sql = "LOAD DATA INFILE%s'%s' INTO TABLE %s FIELDS TERMINATED BY '|'LINES%sTERMINATED BY %s IGNORE %i LINES;" \
-		% (replace, import_filename, sql_table, start_by, newlines, ignore_lines)
+	import_sql = "LOAD DATA INFILE '%s'%sINTO TABLE %s FIELDS TERMINATED BY '|'LINES%sTERMINATED BY %s IGNORE %i LINES;" \
+		% (import_filename, replace, sql_table, start_by, newlines, ignore_lines)
 
 	# -----SQL-----
 	db_connection = MySQLdb.connect(host=sql_host, port=sql_port, user=sql_user, passwd=sql_passwd, db=sql_database)
@@ -163,10 +165,10 @@ def main():
 		cursor.execute('TRUNCATE TABLE ' + sql_table + ';')
 		db_connection.commit()
 	
-	if must_dl or options.init: # if nothing was downladed and not --init was passed do nothing
+	if must_dl or options.init or diff_filename: # if nothing was downladed and not --init was passed do nothing
 		if options.verbose:
 			print datetime.now(), 'Importando: ', os.path.basename(import_filename), ' a tabla: ', sql_table
-			print cursor.execute(import_sql), ' registros agregados'
+			print cursor.execute(import_sql), ' registros afectados'
 		else:
 			cursor.execute(import_sql)
 			
@@ -180,13 +182,14 @@ def main():
 	# -----END-----
 	try:
 		os.remove(old_filename)
-	except:
+	except OSError:
 		pass
 
-	try:
+	if diff_filename:
 		os.remove(diff_filename)
-	except:
-		pass
+
+	if not must_dl and not options.init and not diff_filename and options.verbose:
+		print 'no hice nada'
 
 if __name__ == "__main__":
 	main()

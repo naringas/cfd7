@@ -60,9 +60,8 @@ def main():
 	global options
 	parser = OptionParser("python script.py [options]")
 	parser.add_option('--init', action='store_true', dest='init', default=False,
-		help='Vacia las tablas e importa (--no-ftp o --force-dl implican esto).')
-	parser.add_option('-v', '--verbose', action='store_true', dest='verbose', default=False,
-		help='Modo callado/silencioso. Tambien evita las preguntas.')
+		help='Vacia las tablas e importa.')
+	parser.add_option('-v', '--verbose', action='store_true', dest='verbose', default=False)
 	(options, args) = parser.parse_args()
 
 	# PROGRAM
@@ -125,8 +124,13 @@ def main():
 
 	# -----pre-SQL-----
 	# make SQL statement
-	import_filename = dl_filename
-	if filename != dl_filename: # if must_dl and not options.init
+	try:
+		import_filename = dl_filename
+	except NameError:
+		import_filename = filename
+
+	# if filename != dl_filename: # if must_dl and not options.init:
+	if must_dl and not options.init:
 		ignore_lines = 0
 	else:
 		ignore_lines = 1
@@ -162,14 +166,17 @@ def main():
 	db_connection.close()
 
 	# -----END-----
-	if filename != dl_filename: # if must_dl and not options.init
-		f = open(filename, 'rU')
-		diff_f = open(dl_filename, 'a')
+	# if filename != dl_filename: # if must_dl and not options.init:
+	if must_dl and not options.init:
+		f = open(filename, 'a')
+		diff_f = open(dl_filename, 'rU')
 		f.writelines(diff_f.readlines())
 		f.close()
 		diff_f.close()
 		os.remove(dl_filename)
 
+	if not must_dl and not options.init and options.verbose:
+		print 'no hice nada'
 
 if __name__ == "__main__":
 	main()
