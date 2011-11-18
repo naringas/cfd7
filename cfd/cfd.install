@@ -14,7 +14,7 @@ function cfd_schema() {
     'fields' => array(
       'no_serie' => array(
         'type' => 'int',
-        'size' => 'PDF_begin_glyph(pdfdoc, glyphname, wx, llx, lly, urx, ury)',
+        'size' => 'big',
         'unsigned' => TRUE,
         'not null' => TRUE,
         'description' => 'noCertificado attribute of a CFD',
