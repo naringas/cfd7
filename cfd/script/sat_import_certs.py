@@ -4,7 +4,7 @@ import os, sys, progressbar, MySQLdb
 from optparse import OptionParser
 from ftplib import FTP, error_reply
 from datetime import datetime
-from difflib import unified_diff
+from difflib import SequenceMatcher
 #
 ## CONFIGURACION
 #
@@ -42,13 +42,23 @@ def get_newlines(filename):
 	fd.close()
 	return repr(fd.newlines)
 
+"""Simplified version of difflib.unified_diff()
+Simply returns new or different lines from b"""
+def newlines_diff(a, b):
+	for group in SequenceMatcher(None,a,b).get_grouped_opcodes(0):
+		for tag, i1, i2, j1, j2 in group:
+			if tag in ('replace', 'insert'):
+				for line in b[j1:j2]:
+					yield line
+
+
 """Generates a diff file to import, appends '_diff' to new's fileanme
 writes the file and returns the filename"""
 def make_diff(old, new):
 	fromlines = open(old, 'U').readlines()
 	tolines = open(new, 'U').readlines()
 	diff_filename = new[:-4] + '_diff' + new[-4:]
-	diff = unified_diff(fromlines, tolines, n=0)
+	diff = newlines_diff(fromlines, tolines)
 	diff_file = open(diff_filename, 'w')
 	diff_file.writelines(diff)
 	diff_file.close()
@@ -139,21 +149,19 @@ def main():
 	if os.access(old_filename, os.F_OK) and not options.init:
 		diff_filename = make_diff(old_filename, filename)
 		import_filename = diff_filename
-		ignore_lines = 3
-		start_by = " STARTING BY '+' "
+		ignore_lines = 0
 		replace = ' REPLACE '
 	else:
 		import_filename = filename
 		ignore_lines = 1
 		replace = ' '
-		start_by = ' '
 		# so that the table is truncated because the difference file is not being used
 		# options.init = True
 
 	newlines = get_newlines(import_filename)
 	import_filename = os.path.abspath(import_filename).replace('\\', r'\\')
-	import_sql = "LOAD DATA INFILE '%s'%sINTO TABLE %s FIELDS TERMINATED BY '|'LINES%sTERMINATED BY %s IGNORE %i LINES;" \
-		% (import_filename, replace, sql_table, start_by, newlines, ignore_lines)
+	import_sql = "LOAD DATA INFILE '%s'%sINTO TABLE %s FIELDS TERMINATED BY '|'LINES TERMINATED BY %s IGNORE %i LINES;" \
+		% (import_filename, replace, sql_table, newlines, ignore_lines)
 
 	# -----SQL-----
 	db_connection = MySQLdb.connect(host=sql_host, port=sql_port, user=sql_user, passwd=sql_passwd, db=sql_database)
