@@ -157,8 +157,10 @@ function cfd_validate_sello($xml) {
   // Since @certificado is optional in a CFD
   if($certificado->length) {
     // convert $certificado into something openssl can parse
+    // but first decode entities and remove whitespaces (and newlines, etc...)
+    $cert = preg_replace('/\s+/', '', html_entity_decode($certificado->item(0)->value, ENT_QUOTES, 'UTF-8'));
     $pub_cer = "-----BEGIN CERTIFICATE-----\r\n";
-    $pub_cer .= wordwrap($certificado->item(0)->value, 64, "\r\n", true);
+    $pub_cer .= wordwrap($cert, 64, "\r\n", true);
     $pub_cer .= "\r\n-----END CERTIFICATE-----";
     $pub_key = openssl_pkey_get_public($pub_cer);
 
