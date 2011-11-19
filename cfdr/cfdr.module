@@ -3,9 +3,11 @@
  * @file Main module file
  */
 
- define('TYPE_CFD' , 0);
- define('TYPE_CFDI', 1);
-
+define('TYPE_CFD' , 0);
+define('TYPE_CFDI', 1);
+define('CFD_INGRESO' , 0);
+define('CFD_EGRESO'  , 1);
+define('CFD_TRASLADO', 2);
 /**
  * Implementation of hook_menu().
  */
@@ -89,6 +91,8 @@ function cfdr_permission() {
 
 /**
  * Saves a fully loaded cfdr object to {cfdr}
+ * @return If the record insert or update failed, returns FALSE.
+ *  If it succeeded, returns SAVED_NEW or SAVED_UPDATED, depending on the operation performed.
  **/
 function cfdr_save(&$cfdr) {
   return drupal_write_record('cfdr', $cfdr);
@@ -99,12 +103,12 @@ function cfdr_save(&$cfdr) {
  * @param string $cfdr_filename the full path and name of the CFD's .xml file
  **/
 function cfdr_insert($filename) {
-  //parse XML file read (with xml DOM(simpleXML sucks at namespaces))
+  //parse XML file read (with DOM XML(simpleXML sucks at namespaces))
   $doc = new DOMDocument();
   @$doc->load($filename, LIBXML_NOWARNING);
-  // if we're dealing with CFD (and not CFDi)
   $xpath = new DOMXPath($doc);
   $cfdr = new stdClass();
+  // if we're dealing with CFD (and not CFDi)
   if ($doc->isDefaultNamespace('http://www.sat.gob.mx/cfd/2')) {
     $xpath->registerNamespace('cfd', 'http://www.sat.gob.mx/cfd/2');
     $cfdr->xml_type = TYPE_CFD;
@@ -113,24 +117,33 @@ function cfdr_insert($filename) {
     $xpath->registerNamespace('cfd', 'http://www.sat.gob.mx/cfd/3');
     $cfdr->xml_type = TYPE_CFDI;
   }
-  // abort if not on a CFD or CFDI
   $fecha_cfd = $xpath->query('/cfd:Comprobante/@fecha');
+  // abort if not on a CFD or CFDI
   if (!$fecha_cfd->length) return FALSE;
-  $serie = $xpath->query('/cfd:Comprobante/@serie');
-  $folio = $xpath->query('/cfd:Comprobante/@folio');
-  $receptor_rfc = $xpath->query('/cfd:Comprobante/cfd:Receptor/@rfc');
-  $emisor_rfc = $xpath->query('/cfd:Comprobante/cfd:Emisor/@rfc');
-  $emisor_nombre = $xpath->query('/cfd:Comprobante/cfd:Emisor/@nombre');
-  $importe = $xpath->query('/cfd:Comprobante/@total');
+  $cfdr->$serie          = $xpath->query('/cfd:Comprobante/@serie')->item(0)->value;
+  $cfdr->$folio          = $xpath->query('/cfd:Comprobante/@folio')->item(0)->value;
+  $cfdr->$noApprobacion  = $xpath->query('/cfd:Comprobante/@noAprobacion')->item(0)->value;
+  $cfdr->$anoApprobacion = $xpath->query('/cfd:Comprobante/@anoAprobacion')->item(0)->value;
+  $cfdr->$emisor_rfc     = $xpath->query('/cfd:Comprobante/cfd:Emisor/@rfc')->item(0)->value;
+  $cfdr->$emisor_nombre  = $xpath->query('/cfd:Comprobante/cfd:Emisor/@nombre')->item(0)->value;
+  $cfdr->$receptor_rfc   = $xpath->query('/cfd:Comprobante/cfd:Receptor/@rfc')->item(0)->value;
+  $cfdr->$fecha_cfd      = $fecha_cfd->item(0)->value;
+  $cfdr->$importe        = $xpath->query('/cfd:Comprobante/@total')->item(0)->value;
+  $cfdr->$noCertificado  = $xpath->query('/cfd:Comprobante/@noCertificado')->item(0)->value;
+  $cfdr->xml_filename    = $filename;
 
-  $cfdr->serie = $serie->item(0)->value;
-  $cfdr->folio = $folio->item(0)->value;
-  $cfdr->receptor_rfc = $receptor_rfc->item(0)->value;
-  $cfdr->emisor_rfc = $emisor_rfc->item(0)->value;
-  $cfdr->emisor_nombre = $emisor_nombre->item(0)->value;
-  $cfdr->fecha_cfd = $fecha_cfd->item(0)->value;
-  $cfdr->importe = $importe->item(0)->value;
-  $cfdr->xml_filename = $filename;
+  $cfdr_type             = $xpath->query('/cfr:Comprobante/')->item(0)->value;
+  switch ($cfdr_type) {
+    case 'ingreso':
+      $cfdr->cfd_type = CFD_INGRESO;
+    break;
+    case 'egreso':
+      $cfdr->cfd_type = CFD_EGRESO;
+    break;
+    case 'traslado':
+      $cfdr->cfd_type = CFD_TRASLADO;
+    break;
+  }
 
   return cfdr_save($cfdr);
 }
@@ -204,6 +217,7 @@ function cfdr_view_cfds() {
             $query->isNotNull('nav_number');
           else
             $query->condition('nav_number', $value);
+        break;
       }
     }
   }
@@ -236,7 +250,9 @@ function cfdr_view_cfds() {
         array('data' => cfdr_validity_image($cfd->valid, $cfd->cfdr_id), 'style' => 'text-align:center;'),
         $cfd->serie,
         $cfd->folio,
-        $cfd->emisor_nombre,
+        (strlen($cfd->emisor_nombre) >=50)
+          ? array('data' => substr($cfd->emisor_nombre, 0, 47) . '...', 'title'=>$cfd->emisor_nombre)
+          : $cfd->emisor_nombre,
         format_date($fecha->format(DATE_FORMAT_UNIX), 'custom', 'j M Y'),
         $cfd->receptor_rfc,
         array('data' => '$' . number_format($cfd->importe, 2), 'style' => 'text-align:right;'),
@@ -438,6 +454,11 @@ function theme_cfdr_filters_fieldset($variables) {
 function cfdr_view_single($cfd) {
   drupal_set_breadcrumb(array(l(t('Home'), ''), l('Ver CFDs', 'cfdr')));
   drupal_set_title("$cfd->serie $cfd->folio" . ' - ' . /*l('PDF', "cfdr/$cfd->cfdr_id/pdf") . ' - ' . */l('xml', "cfdr/$cfd->cfdr_id/xml"), PASS_THROUGH);
+  drupal_add_css(
+    '.validstatusR {color:white; font-weight:bold; text-align:center; background-color: red;}
+    .validstatusY {color:grey; font-weight:bold; text-align:center; background-color: yellow;}
+    .validstatusG {color:white; font-weight:bold; text-align:center; background-color: green;}'
+    , array('type' => 'inline'));
 
   $doc = new DOMDocument();
   $doc->load($cfd->xml_filename, LIBXML_NOWARNING);
@@ -456,8 +477,10 @@ function cfdr_view_single($cfd) {
   $struct_valid = cfd_validate_schema($cfd->xml_filename);
   $sello_valid = cfd_validate_sello($cfd->xml_filename);
   $header = array(
-    array('data' => 'Estructura XML (parcial)', 'colspan' => 2,),
-    array('data' => 'Sello', 'colspan' => 2,),
+    array('data' => 'Estructura XML (parcial)'),
+    array('data' => 'Sello'),
+    array('data' => 'Certificado'),
+    array('data' => 'Folio'),
   );
   $rows = array(
     array(
@@ -465,19 +488,30 @@ function cfdr_view_single($cfd) {
       'data' => array(
         array(
           'data' => $struct_valid ? 'Valido' : 'Invalido',
-          'style' => 'color:white; font-weight:bold; text-align:center; background-color:' . ($struct_valid ? 'green' : 'red'),
-          'colspan' => 2,
+          'class' => $struct_valid ? 'validstatusG' : 'validstatusR',
+          'style' => 'width: 25%;',
         ),
         array(
           'data' => $sello_valid,
-          'style' => 'color:white; font-weight:bold; text-align:center; text-transform:capitalize; background-color:' . ($sello_valid == 'indeterminado' ? 'yellow' : ($sello_valid == 'valido' ? 'green' : 'red')),
-          'colspan' => 2,
+          'class' => ($sello_valid == 'indeterminado' ? 'validstatusY' : ($sello_valid == 'valido' ? 'validstatusG' : 'validstatusR')),
+          'style' => 'width: 25%;',
+        ),
+        array(
+          'data' => 'Validez Cert',
+          'class' => 'validstatusY',
+          'style' => 'width: 25%;',
+        ),
+        array(
+          'data' => 'Validez Folio',
+          'class' => 'validstatusY',
+          'style' => 'width: 25%;',
         ),
       ),
     ),
+    array('no_stripping' => TRUE, 'data' => array(array('data' => '&nbsp;', 'style' => 'background-color: white;', 'colspan' => 4))),
     array(
       'no_striping' => TRUE,
-      'data' => array(
+      'data' => array(  
         array(
           'data' => 'Status',
           'header' => TRUE,
@@ -539,6 +573,7 @@ function cfdr_view_single_form($form, &$form_state, $cfd) {
     '#type' => 'textfield',
     '#title' => 'NAV FC-',
     '#default_value' => $cfd->nav_number,
+    '#description' => 'Número de documento de NAV<br/>User números negativos (-1) para cancelados',
   );
   // Buttons
   $form['efield']['update'] = array(
@@ -608,8 +643,8 @@ function _cfdr_valid2option($valid) {
 function theme_cfdr_view_single_fieldset_form($variables) {
   $form = $variables['form'];
   $output = '<table><tr style="background-color: white;">';
-    $output .= '<td>' . drupal_render($form['valid']) . '</td>';
-    $output .= '<td>' . drupal_render($form['nav_number']) . '</td>';
+    $output .= '<td style="width: 50%;">' . drupal_render($form['valid']) . '</td>';
+    $output .= '<td style="width: 50%;">' . drupal_render($form['nav_number']) . '</td>';
   $output .= '</tr></table>';
   $output .= drupal_render($form['update']);
   return $output;
@@ -707,8 +742,10 @@ function cfdr_scan() {
       if ($count > 100) break;
       $new_filename = $move_path . '/' . $file->filename;
       if ($resulting_fileuri = file_unmanaged_move($file->uri, $new_filename)) {
-        if (cfdr_insert($resulting_fileuri)) // add entry to {cfdr} form .xml file
+        // add entry to {cfdr} from .xml file
+        if (cfdr_insert($resulting_fileuri)) {
           $count++;
+        }
         else {
           file_unmanaged_move($resulting_fileuri, $fail_path . '/' . basename($resulting_fileuri));
         }

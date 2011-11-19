@@ -1,5 +1,5 @@
 name = CFD - Common
-description = Provides common functions for other CFD modules (PDF, schema validation)
+description = Provides common functions for other CFD modules (PDF, validation)
 core = 7.x
 dependencies[] = libraries
 files[]=resources/FEpdf.php

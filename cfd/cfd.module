@@ -101,7 +101,7 @@ function cfd_validate_schema($xml) {
 
   // gather problem nodes: Addenda, Complemento
   $doc_el = $doc->documentElement;
-  $addenda_list = $doc_el->getElementsByTagName('Addenda');
+  $addenda_list     = $doc_el->getElementsByTagName('Addenda');
   $complemento_list = $doc_el->getElementsByTagName('Complemento');
   //remove these gathered nodes
   foreach($addenda_list as $addenda) {
@@ -175,4 +175,7 @@ function cfd_validate_sello($xml) {
     }
   } else
     return 'indeterminado';
+}
+
+function cfd_validate_folio($serie, $folio, $noAprobacion, $anoAprobacion, $emisor_rfc) {
 }

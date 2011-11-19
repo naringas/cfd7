@@ -11,7 +11,7 @@
 				font-size: 10pt;
 				width: 100%;
 			}
-			th, td {
+			.top th, .top td {
 				width: 50%;
 			}
 			td.h {

@@ -30,6 +30,20 @@ function cfdr_schema() {
         'not null' => FALSE,
         'description' => "cfd's number",
       ),
+      'noAprobracion' => array(
+        'type' => 'int',
+        'size' => 'normal',
+        'unsigned' => TRUE,
+        'not null' => FALSE,
+        'description' => "folio approval number",
+      ),
+      'anoAprobracion' => array(
+        'type' => 'int',
+        'size' => 'small',
+        'unsigned' => TRUE,
+        'not null' => FALSE,
+        'description' => "folio approval year",
+      ),
       'emisor_rfc' => array(
         'type' => 'varchar',
         'length' => '13',
@@ -49,8 +63,8 @@ function cfdr_schema() {
         'description' => "Receiving party's RFC",
       ),
       'fecha_cfd' => array(
-        'type' => 'datetime',
-        // 'mysql_type' => 'DATETIME',
+        'mysql_type' => 'DATETIME',
+        'pgsql_type' => 'timestamp without time zone',
         'not null' => FALSE,
         'description' => 'Date of the CFD',
       ),
@@ -62,18 +76,46 @@ function cfdr_schema() {
         'not null' => FALSE,
         'description' => 'Total amount of the CFD',
       ),
+      'noCertificado' => array(
+        'type' => 'int',
+        'size' => 'normal',
+        'unsigned' => TRUE,
+        'not null' => FALSE,
+        'description' => "Certificate's (CSD) number",
+      ),
       'xml_filename' => array(
         'type' => 'varchar',
         'length' => '510',
         'not null' => TRUE,
         'description' => 'The full filename of the XML file',
       ),
-      'valid' => array(
+      'validstatus_xml' => array(
         'type' => 'int',
         'size' => 'tiny',
         'unsigned' => 'true',
         'not null' => FALSE,
-        'description' => 'Stores the validity (status) of the CFD. NULL means it is not validated yet',
+        'description' => "Stores the validity status of the CFD's XML structure. NULL means it is not validated yet",
+      ),
+      'validstatus_sellos' => array(
+        'type' => 'int',
+        'size' => 'tiny',
+        'unsigned' => 'true',
+        'not null' => FALSE,
+        'description' => "Stores the validity status of the CFD's sello. NULL means it is not validated yet",
+      ),
+      'validstatus_cert' => array(
+        'type' => 'int',
+        'size' => 'tiny',
+        'unsigned' => 'true',
+        'not null' => FALSE,
+        'description' => "Stores the validity status of the CFD's certificate. NULL means it is not validated yet",
+      ),
+      'validstatus_folio' => array(
+        'type' => 'int',
+        'size' => 'tiny',
+        'unsigned' => 'true',
+        'not null' => FALSE,
+        'description' => "Stores the validity status of the CFD's foilo. NULL means it is not validated yet",
       ),
       'nav_number' => array(
         'type' => 'int',
@@ -85,28 +127,41 @@ function cfdr_schema() {
         'size' => 'tiny',
         'unsigned' => 'true',
         'not null' => TRUE,
+        'description' => 'Stores whether CFD or CFDI',
+      ),
+      'cfd_type' => array(
+        'type' => 'int',
+        'size' => 'tiny',
+        'unsigned' => 'true',
+        'not null' => TRUE,
+        'description' => 'Stores type of CFD /Comprobante/@tipoDeComprobante (ingreso, egreso, traslado)' ,
       ),
     ),
     'primary key' => array('cfdr_id'),
     'indexes' => array(
       'date' => array('fecha_cfd'),
-      'serie' => array('serie'),
-      'folio' => array('folio'),
-      'emisor' => array('emisor_rfc')
+      'emisor' => array('emisor_rfc'),
+      'receptor' => array('receptor_rfc'),
+      'validstatus' => array('validstatus_xml', 'validstatus_sellos', 'validstatus_cert', 'validstatus_folio'),
     ),
   );
+  $schema['cfdr_fail'] = array(
+    'description' => 'Stores XML files which cannot be procesed',
+    'fields' => array(
+      'id' => array(
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'description' => "The file id",
+      ),
+      'xml_filename' => array(
+        'type' => 'varchar',
+        'length' => '510',
+        'not null' => TRUE,
+        'description' => 'The full filename of the XML file',
+      ),
+    ),
+    'primary key' => array('id'),
+  );
   return $schema;
-}
-
-/**
- * adds 'xml_type' field
- */
-function cfdr_update_7001() {
-  db_add_field('cfdr', 'xml_type', array(
-    'type' => 'int',
-    'size' => 'tiny',
-    'unsigned' => 'true',
-    'not null' => TRUE,
-    'initial' => 0, // 0 is TYPE_CFD
-  ));
 }
