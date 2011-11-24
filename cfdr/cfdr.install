@@ -116,6 +116,12 @@ function cfdr_schema() {
         'not null' => FALSE,
         'description' => "Stores the validity status of the CFD's foilo. NULL means it is not validated yet",
       ),
+      'validstatus_sat' => array(
+        'type' => 'varchar',
+        'length' => '2',
+        'not null' => FALSE,
+        'description' => "SAT's validity response. Valid(V) or Invalid(I): folio certificado",
+      ),
       'nav_number' => array(
         'type' => 'int',
         'size' => 'normal',
