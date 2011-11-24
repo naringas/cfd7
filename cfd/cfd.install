@@ -13,9 +13,8 @@ function cfd_schema() {
     'description' => 'Stores SAT information about certificate validity',
     'fields' => array(
       'no_serie' => array(
-        'type' => 'int',
-        'size' => 'big',
-        'unsigned' => TRUE,
+        'type' => 'varchar',
+        'length' => '20',
         'not null' => TRUE,
         'description' => 'noCertificado attribute of a CFD',
       ),
@@ -41,7 +40,7 @@ function cfd_schema() {
         'type' => 'varchar',
         'length' => '1',
         'not null' => TRUE,
-        'description' => 'Certificate status: A - approved. R - ?. C - ?',
+        'description' => 'Certificate status: A - Activo. R - Rechazado?. C - Cancelado?',
       ),
     ),
     'primary key' => array('no_serie'),
@@ -101,8 +100,4 @@ function cfd_schema() {
     )
   );
   return $schema;
-}
-
-function cfd_update_7001() {
-  
 }

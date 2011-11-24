@@ -30,14 +30,14 @@ function cfdr_schema() {
         'not null' => FALSE,
         'description' => "cfd's number",
       ),
-      'noAprobracion' => array(
+      'no_aprobacion' => array(
         'type' => 'int',
         'size' => 'normal',
         'unsigned' => TRUE,
         'not null' => FALSE,
         'description' => "folio approval number",
       ),
-      'anoAprobracion' => array(
+      'ano_aprobacion' => array(
         'type' => 'int',
         'size' => 'small',
         'unsigned' => TRUE,
@@ -76,10 +76,9 @@ function cfdr_schema() {
         'not null' => FALSE,
         'description' => 'Total amount of the CFD',
       ),
-      'noCertificado' => array(
-        'type' => 'int',
-        'size' => 'normal',
-        'unsigned' => TRUE,
+      'no_certificado' => array(
+        'type' => 'varchar',
+        'length' => '20',
         'not null' => FALSE,
         'description' => "Certificate's (CSD) number",
       ),

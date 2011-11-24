@@ -8,6 +8,7 @@ define('TYPE_CFDI', 1);
 define('CFD_INGRESO' , 0);
 define('CFD_EGRESO'  , 1);
 define('CFD_TRASLADO', 2);
+
 /**
  * Implementation of hook_menu().
  */
@@ -120,19 +121,19 @@ function cfdr_insert($filename) {
   $fecha_cfd = $xpath->query('/cfd:Comprobante/@fecha');
   // abort if not on a CFD or CFDI
   if (!$fecha_cfd->length) return FALSE;
-  $cfdr->$serie          = $xpath->query('/cfd:Comprobante/@serie')->item(0)->value;
-  $cfdr->$folio          = $xpath->query('/cfd:Comprobante/@folio')->item(0)->value;
-  $cfdr->$noApprobacion  = $xpath->query('/cfd:Comprobante/@noAprobacion')->item(0)->value;
-  $cfdr->$anoApprobacion = $xpath->query('/cfd:Comprobante/@anoAprobacion')->item(0)->value;
-  $cfdr->$emisor_rfc     = $xpath->query('/cfd:Comprobante/cfd:Emisor/@rfc')->item(0)->value;
-  $cfdr->$emisor_nombre  = $xpath->query('/cfd:Comprobante/cfd:Emisor/@nombre')->item(0)->value;
-  $cfdr->$receptor_rfc   = $xpath->query('/cfd:Comprobante/cfd:Receptor/@rfc')->item(0)->value;
-  $cfdr->$fecha_cfd      = $fecha_cfd->item(0)->value;
-  $cfdr->$importe        = $xpath->query('/cfd:Comprobante/@total')->item(0)->value;
-  $cfdr->$noCertificado  = $xpath->query('/cfd:Comprobante/@noCertificado')->item(0)->value;
+  $cfdr->fecha_cfd       = $fecha_cfd->item(0)->value;
+  $cfdr->serie           = $xpath->query('/cfd:Comprobante/@serie')->item(0)->value;
+  $cfdr->folio           = $xpath->query('/cfd:Comprobante/@folio')->item(0)->value;
+  $cfdr->no_aprobacion   = $xpath->query('/cfd:Comprobante/@noAprobacion')->item(0)->value;
+  $cfdr->ano_aprobacion  = $xpath->query('/cfd:Comprobante/@anoAprobacion')->item(0)->value;
+  $cfdr->emisor_rfc      = $xpath->query('/cfd:Comprobante/cfd:Emisor/@rfc')->item(0)->value;
+  $cfdr->emisor_nombre   = $xpath->query('/cfd:Comprobante/cfd:Emisor/@nombre')->item(0)->value;
+  $cfdr->receptor_rfc    = $xpath->query('/cfd:Comprobante/cfd:Receptor/@rfc')->item(0)->value;
+  $cfdr->importe         = $xpath->query('/cfd:Comprobante/@total')->item(0)->value;
+  $cfdr->no_certificado  = $xpath->query('/cfd:Comprobante/@noCertificado')->item(0)->value;
+  $cfdr_type             = $xpath->query('/cfd:Comprobante/@tipoDeComprobante')->item(0)->value;
   $cfdr->xml_filename    = $filename;
 
-  $cfdr_type             = $xpath->query('/cfr:Comprobante/')->item(0)->value;
   switch ($cfdr_type) {
     case 'ingreso':
       $cfdr->cfd_type = CFD_INGRESO;
@@ -476,6 +477,9 @@ function cfdr_view_single($cfd) {
 
   $struct_valid = cfd_validate_schema($cfd->xml_filename);
   $sello_valid = cfd_validate_sello($cfd->xml_filename);
+  $cert_valid = cfd_validate_cert($cfd->no_certificado, $cfd->emisor_rfc, $cfd->fecha_cfd);
+  $folio_valid = cfd_validate_folio($cfd->serie, $cfd->folio, $cfd->no_aprobacion, $cfd->ano_aprobacion, $cfd->emisor_rfc);
+  drupal_set_message("$cfd->serie, $cfd->folio, $cfd->no_aprobacion, $cfd->ano_aprobacion, $cfd->emisor_rfc");
   $header = array(
     array('data' => 'Estructura XML (parcial)'),
     array('data' => 'Sello'),
@@ -498,12 +502,12 @@ function cfdr_view_single($cfd) {
         ),
         array(
           'data' => 'Validez Cert',
-          'class' => 'validstatusY',
+          'class' => $cert_valid ? 'validstatusG' : 'validstatusR',
           'style' => 'width: 25%;',
         ),
         array(
           'data' => 'Validez Folio',
-          'class' => 'validstatusY',
+          'class' => $folio_valid ? 'validstatusG' : 'validstatusR',
           'style' => 'width: 25%;',
         ),
       ),

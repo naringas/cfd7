@@ -179,5 +179,133 @@ function cfd_validate_sello($xml) {
     return 'indeterminado';
 }
 
-function cfd_validate_folio($serie, $folio, $noAprobacion, $anoAprobacion, $emisor_rfc) {
+/**
+ * Valida el folio localmente
+ */
+function cfd_validate_folio($serie, $folio, $noAprobacion, $anoAprobacion, $RFC) {
+  $query_string = <<<SQL
+SELECT count(*) as validstatus
+FROM {cfd_folios}
+WHERE RFC = :RFC
+AND Serie = :serie
+AND noAprobacion = :noAprobacion
+AND anoAprobacion = :anoAprobacion
+AND :folio BETWEEN FolioInicial AND FolioFinal;
+SQL;
+  $result = db_query($query_string, array(
+    ':serie' => $serie,
+    ':folio' => $folio,
+    ':noAprobacion' => $noAprobacion,
+    ':anoAprobacion' => $anoAprobacion,
+    ':RFC' => $RFC,
+  ))->fetchAssoc();
+  return $result['validstatus'];
+}
+
+/**
+ * Valida el certificado localmente
+ */
+function cfd_validate_cert($noCertificado, $RFC, $fecha) {
+  $query_string = <<<SQL
+SELECT count(*) as validstatus
+FROM {cfd_certs}
+WHERE no_serie = :noCertificado
+AND RFC = :RFC
+AND :fecha BETWEEN fecha_inicial_cert AND fecha_final_cert;
+SQL;
+  $result = db_query($query_string, array(
+    ':noCertificado' => $noCertificado,
+    ':RFC' => $RFC,
+    ':fecha' => $fecha,
+  ))->fetchAssoc();
+  return $result['validstatus'];
+}
+
+
+/**
+ * Recive un array y regresa una cadena XML de acuerdo a la especificacion
+ * @param $cfd_array estructura del array (debe usar estos nombres de 'key'):
+ * array(
+ *   array(
+ *     'RFC'            => '...',
+ *     'serie'          => '...',
+ *     'folio'          => '...',
+ *     'no_aprobacion'  => '...',
+ *     'ano_aprobacion' => '...',
+ *     'no_certificado' => '...',
+ *     'fecha'          => '...',
+ *   ),
+ *   array(...),
+ * )
+ * @return string XML
+ */
+function _cfd_generate_multi_request_xml($cfds) {
+  $ns = 'http://www.sat.gob.mx/Asf/Sicofi/ValidacionFoliosCFD/1.0.0';
+  $doc = new DOMDocument('1.0', 'UTF-8');
+  $root = $doc->createElementNS($ns, 'ColleccionFoliosCfd');
+
+  $count = 1;
+  foreach ($cfds as $cfd) {
+    //create elements
+    $folioC         = $doc->createElementNS($ns, 'Folio');
+    $id             = $doc->createElementNS($ns, 'Id'                      , $count++);
+    $rfc            = $doc->createElementNS($ns, 'Rfc'                     , $cfd['RFC']);
+    $serie          = $doc->createElementNS($ns, 'Serie'                   , $cfd['serie']);
+    $folio          = $doc->createElementNS($ns, 'NumeroFolio'             , $cfd['folio']);
+    $no_aprobacion  = $doc->createElementNS($ns, 'NumeroAprobacion'        , $cfd['no_aprobacion']);
+    $ano_aprobacion = $doc->createElementNS($ns, 'AnioAprobacion'          , $cfd['ano_aprobacion']);
+    $no_certificado = $doc->createElementNS($ns, 'CertificadoNumeroSerie'  , $cfd['no_certificado']);
+    $fecha          = $doc->createElementNS($ns, 'CertificadoFechaEmision' , $cfd['fecha']);
+    //append created elements
+    $folioC->appendChild($id);
+    $folioC->appendChild($rfc);
+    $folioC->appendChild($serie);
+    $folioC->appendChild($folio);
+    $folioC->appendChild($no_aprobacion);
+    $folioC->appendChild($ano_aprobacion);
+    $folioC->appendChild($no_certificado);
+    $folioC->appendChild($fecha);
+    //add folioC (folio container) to root
+    $root->appendChild($folioC);
+  }
+  //append root to the document
+  $doc->appendChild($root);
+
+  // $schemaFileName = drupal_get_path('module', 'cfd') . '/resources/sat/SOAPrequest.xsd';
+  // echo $doc->schemaValidate($schemaFileName) ? 'valido' : 'no valido';
+
+  return $doc->saveXML();
+}
+
+/**
+ * Envia una peticion SOAP al servidor SICOFI del SAT
+ * @param string $xml el XML a enviar (sin validar)
+ *  se espera que sea genrado con _cfd_generate_multi_request_xml(...)
+ * @return stirng $xml
+ */
+function _cfd_sat_soap_request($xml) {
+  $wsdl = 'https://tramitesdigitales.sat.gob.mx/Sicofi.wsExtValidacionCFD/WsValidacionCFDsExt.asmx?WSDL';
+  $sat_soap = new SoapClient($wsdl);
+  $response = $sat_soap->ValidarXmlCFD(array('xml' => $validationXML));
+  return $response->ValidarXmlCFDResult;
+}
+
+/**
+ * Interpreta la respuesta del sat
+ * @param string $xml valor devuelto por _cfd_sat_soap_request(...)
+ * @return array con Id como key y codigo de validacion del SAT como valor
+ *  array('1' => 'VV', '2' => 'IV', ...)
+ */
+function _cfd_parse_sat_soap_response($xml) {
+  $doc = new DOMDocument();
+  $doc->preserveWhiteSpace = FALSE;
+  $doc->loadXML($xml);
+  $xpath = new DOMXPath($doc);
+  $r_ids = $xpath->query('/cfd:RespuestaFoliosCfd/cfd:ResultadoValidacion/cfd:Id');
+  foreach ($r_ids as $id_node) {
+    // echo "|- $id_node->tagName -> $id_node->nodeValue\n";
+    // print_r($id_node->nextSibling->nodeValue);
+    $data[$id_node->nodeValue] = $id_node->nextSibling->nodeValue;
+  }
+  return $data;
 }
