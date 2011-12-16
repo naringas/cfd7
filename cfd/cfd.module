@@ -235,6 +235,7 @@ function cfd_validate_tfd($xml_filename) {
     // for CFDI
     $xsl_content_file = drupal_get_path('module', 'cfd') . '/resources/sat/cadenaoriginal_TFD_1_0.xslt';
     $xpath->registerNamespace('cfd', 'http://www.sat.gob.mx/cfd/3');
+    $xpath->registerNamespace('tfd', 'http://www.sat.gob.mx/TimbreFiscalDigital');
   }
   else {
     // in case a CFD (or other incompatible file) was passed

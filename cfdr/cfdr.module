@@ -534,7 +534,7 @@ JS;
         array('data' => '$' . number_format($cfd->importe, 2), 'style' => 'text-align:right;'),
         // TODO check if we have permission to edit this
         // $cfd->nav_number,
-        user_access('edit any CFD') ? 
+        user_access('edit any CFD') && is_null($cfd->nav_number) ? 
           array('data' => array(
             '#type' => 'textfield',
             '#size' => 9,
@@ -850,7 +850,7 @@ CSS;
  */
 function cfdr_view_single($cfd) {
   if (is_null($cfd->validstatus_xml) || is_null($cfd->validstatus_sello) || is_null($cfd->validstatus_cert) || is_null($cfd->validstatus_folio))
-    drupal_goto("/cfdr/$cfd->cfdr_id/d/validate", array('query' => array('destination' => "/cfdr/$cfd->cfdr_id")));
+    drupal_goto("cfdr/$cfd->cfdr_id/d/validate", array('query' => array('destination' => "/cfdr/$cfd->cfdr_id")));
 
   drupal_set_breadcrumb(array(
     l(t('Home'), ''),
@@ -1416,14 +1416,20 @@ function cfdr_validstatus_overview(&$cfd) {
     return l(cfdr_validstatus_image(CFDR_IND) . '&nbsp;&nbsp;Validar', "/cfdr/$cfd->cfdr_id/d/validate",
       array('html' => TRUE, 'query' => array('destination' => "/cfdr/$cfd->cfdr_id")));
   }
-  else if ($cfd->validstatus_xml   != CFDR_VALID ||
-      $cfd->validstatus_sello != CFDR_VALID ||
-      $cfd->validstatus_cert  != CFDR_VALID ||
-      $cfd->validstatus_folio != CFDR_VALID) {
-          return cfdr_validstatus_image(CFDR_INVALID);
+  else if ($cfd->validstatus_xml == CFDR_VALID &&
+      $cfd->validstatus_sello == CFDR_VALID &&
+      $cfd->validstatus_cert  == CFDR_VALID &&
+      $cfd->validstatus_folio == CFDR_VALID) {
+          return cfdr_validstatus_image(CFDR_VALID);
+        }
+  else if ($cfd->validstatus_xml == CFDR_IND ||
+      $cfd->validstatus_sello == CFDR_IND ||
+      $cfd->validstatus_cert  == CFDR_IND ||
+      $cfd->validstatus_folio == CFDR_IND) {
+          return cfdr_validstatus_image(CFDR_IND);
         }
   else
-    return cfdr_validstatus_image(CFDR_VALID);
+    return cfdr_validstatus_image(CFDR_INVALID);
 }
 
 /**
