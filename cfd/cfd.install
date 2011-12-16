@@ -40,7 +40,7 @@ function cfd_schema() {
         'type' => 'varchar',
         'length' => '1',
         'not null' => TRUE,
-        'description' => 'Certificate status: A - Activo. R - Rechazado?. C - Cancelado?',
+        'description' => 'Certificate status: A - Activo. R - Revocado. C - Caducado',
       ),
     ),
     'primary key' => array('no_serie'),
@@ -98,6 +98,24 @@ function cfd_schema() {
       'RFC' => array('RFC'),
       'aprobacion' => array('noAprobacion', 'anoAprobacion'),
     )
+  );
+  $schema['cfd_pac_certs'] = array(
+    'description' => 'Stores PAC certificate',
+    'fields' => array(
+      'no_serie' => array(
+        'type' => 'varchar',
+        'length' => '20',
+        'not null' => TRUE,
+        'description' => "certificate's serial number",
+      ),
+      'cer_filename' => array(
+        'type' => 'varchar',
+        'length' => 510,
+        'not null' => TRUE,
+        'description' => 'filename to cer file',
+      ),
+    ),
+    'primary key' => array('no_serie'),
   );
   return $schema;
 }

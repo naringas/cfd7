@@ -4,6 +4,10 @@
  * Also contatins Schema validation funcitons
  */
 
+ define('CFDR_VALID', 1);
+ define('CFDR_INVALID', 0);
+ define('CFDR_IND', -1);
+
 /**
  * Makes a PDF based on 2 XSL Template files (located in resources/cfd_*.xsl)
  * one for header, one for content and also uses SAT provided file: cadenaoriginal_2_0.xslt
@@ -79,59 +83,96 @@ function cfd_make_pdf($xml) {
     $i++;
   }
   $pdf->Write(0, '|');
-  //serve file
   $pdf->SetCreator("Drupal-CFD module with " . PDF_CREATOR);
   $pdf->SetAuthor(variable_get('site_name', 'the website'));
   return $pdf;
 }
 
 /**
- * Validates a CFD against cfdv2.xsd (XML Schema provided by SAT)
+ * Validates a CFD against cfdv2.xsd * or a CFDI against cfdv3.xsd
+ * (XML Schemas provided by SAT)
  * removes Addenda and Complemento nodes to avoid issues
- * @param mixed $xml filename or xml data to validate
- * @return bool true if it is a valid xml
+ * @param string $xml data to validate
+ * @return bool CFDR_VALID or CFDR_INVALID
  */
 function cfd_validate_schema($xml) {
   $doc = new DOMDocument();
-  //load xml data string or filename
-  if (is_file($xml))
-    $doc->load($xml, LIBXML_NOWARNING);
-  else
-    $doc->loadXML($xml);
+  $doc->loadXML($xml);
 
   // gather problem nodes: Addenda, Complemento
   $doc_el = $doc->documentElement;
   $addenda_list     = $doc_el->getElementsByTagName('Addenda');
   $complemento_list = $doc_el->getElementsByTagName('Complemento');
-  //remove these gathered nodes
+
+  if ($doc->isDefaultNamespace('http://www.sat.gob.mx/cfd/2')) {
+    $schemaFileName = drupal_get_path('module', 'cfd') . '/resources/sat/cfdv2.xsd';
+    foreach($complemento_list as $complemento) {
+      $doc_el->removeChild($complemento);
+    }
+  }
+  else if ($doc->lookupPrefix('http://www.sat.gob.mx/cfd/3') == 'cfdi') {
+    $schemaFileName = drupal_get_path('module', 'cfd') . '/resources/sat/cfdv3_con_tfd.xsd';
+  }
+
+  //remove the problem nodes
   foreach($addenda_list as $addenda) {
     $doc_el->removeChild($addenda);
   }
-  foreach($complemento_list as $complemento) {
-    $doc_el->removeChild($complemento);
-  }
-
-  if ($doc->isDefaultNamespace('http://www.sat.gob.mx/cfd/2'))
-    $schemaFileName = drupal_get_path('module', 'cfd') . '/resources/sat/cfdv2.xsd';
-  else if ($doc->lookupPrefix('http://www.sat.gob.mx/cfd/3') == 'cfdi')
-    $schemaFileName = drupal_get_path('module', 'cfd') . '/resources/sat/cfdv3.xsd';
 
   $validcfd = @$doc->schemaValidate($schemaFileName);
   return $validcfd;
 }
 
 /**
+ * Obtiene el certificado desde el SAT si no se tiene todavia...
+ * @param string $no_serie Certificate's number
+ * @return string $pem_cert PEM formated cert
+ */
+function _cfd_get_cert($no_serie) {
+  $local_cert_dir = variable_get('cfd_cert_path', 'sites/default/cfd/cer');
+  // $cert_filename = "$local_cert_dir/$no_serie.cer";
+  // Try to get cer_filename form DB
+  if (!$cer_filename = db_query('SELECT cer_filename FROM {cfd_pac_certs} WHERE no_serie=?', array($no_serie))->fetchField()) {
+    $ftp_server = variable_get('cfd_sat_ftp', 'ftp2.sat.gob.mx');
+    $remote_cert_dir   = variable_get('cfd_sat_ftp_dir', 'Certificados/FEA');
+    $remote_cert_dir  .= '/' . substr($no_serie, 0, 6) . '/' . substr($no_serie, 6, 6);
+    $remote_cert_dir  .= '/' . substr($no_serie, 12, 2) . '/' . substr($no_serie, 14, 2) . '/' . substr($no_serie, 16, 2);
+
+    $sat_ftp = ftp_connect($ftp_server);
+    ftp_login($sat_ftp, 'Anonymous', '');
+    ftp_chdir($sat_ftp, $remote_cert_dir);
+    if (ftp_get($sat_ftp, "$local_cert_dir/$no_serie.cer", "$no_serie.cer", FTP_BINARY)) {
+      $cer_filename = "$local_cert_dir/$no_serie.cer";
+      $cert_entry['no_serie'] = $no_serie;
+      $cert_entry['cer_filename'] = $cer_filename;
+
+      drupal_write_record('cfd_pac_certs', $cert_entry);
+      drupal_set_message('Se obtubo el certificado desde el SAT.');
+    }
+    else {
+      drupal_set_message('Error al obtener el Certificado. Intente más tarde.', 'error');
+      return FALSE;
+    }
+    ftp_close($sat_ftp);
+
+  }
+
+  $cert = base64_encode(file_get_contents($cer_filename));
+  $pem_cert  = "-----BEGIN CERTIFICATE-----\r\n";
+  $pem_cert .= wordwrap($cert, 64, "\r\n", true);
+  $pem_cert .= "\r\n-----END CERTIFICATE-----";
+
+  return $pem_cert;
+}
+
+/**
  * Validates the CFD's 'sello'
- * @param mixed $xml The xml string or .xml file of the CFD to convert to PDF
- * @return string valido, invalido or intdeterminado
+ * @param string $xml The xml string of the CFD to validate
+ * @return int CFDR_IND, CFDR_VALID, or CFDR_INVALID
  **/
 function cfd_validate_sello($xml) {
-  // get cadena original using SAT provided XSLT file.
   $doc = new DOMDocument();
-  if (is_file($xml))
-    $doc->load($xml, LIBXML_NOWARNING);
-  else
-    $doc->loadXML($xml);
+  $doc->loadXML($xml);
 
   $xsl_content = new DOMDocument();
   $xpath = new DOMXPath($doc);
@@ -149,6 +190,7 @@ function cfd_validate_sello($xml) {
   $year = substr($xpath->query('/cfd:Comprobante/@fecha')->item(0)->value, 0, 4);
   $certificado = $xpath->query('/cfd:Comprobante/@certificado');
   $sello = $xpath->query('/cfd:Comprobante/@sello')->item(0)->value;
+  // get cadena original using SAT provided XSLT file.
   $xsl_content->load($xsl_content_file, LIBXML_NOWARNING);
   $xsl = new XSLTProcessor(); @$xsl->importStylesheet($xsl_content);
   $cadena_original = $xsl->transformToXml($doc);
@@ -159,24 +201,77 @@ function cfd_validate_sello($xml) {
     // convert $certificado into something openssl can parse
     // but first decode entities and remove whitespaces (and newlines, etc...)
     $cert = preg_replace('/\s+/', '', html_entity_decode($certificado->item(0)->value, ENT_QUOTES, 'UTF-8'));
-    $pub_cer = "-----BEGIN CERTIFICATE-----\r\n";
-    $pub_cer .= wordwrap($cert, 64, "\r\n", true);
-    $pub_cer .= "\r\n-----END CERTIFICATE-----";
-    $pub_key = openssl_pkey_get_public($pub_cer);
+    $pem_cert  = "-----BEGIN CERTIFICATE-----\r\n";
+    $pem_cert .= wordwrap($cert, 64, "\r\n", true);
+    $pem_cert .= "\r\n-----END CERTIFICATE-----";
+  }
+  else {
+    // obtain cert from DB or SAT's servers
+    $no_certificado = $xpath->query('/cfd:Comprobante/@noCertificado')->item(0)->value;
+    if (!$pem_cert = _cfd_get_cert($no_certificado))
+      return CFDR_IND;
+  }
+
+  // DO validation with cert
+  $pub_key = openssl_pkey_get_public($pem_cert);
+  if ($year <= 2010)
+    $v = openssl_verify($cadena_original, base64_decode($sello), $pub_key, OPENSSL_ALGO_MD5);
+  else
+    $v = openssl_verify($cadena_original, base64_decode($sello), $pub_key, OPENSSL_ALGO_SHA1);
+
+  return $v;
+}
+
+/**
+ * Validates the TFD of a CFDR_IND
+ */
+function cfd_validate_tfd($xml_filename) {
+  $doc = new DOMDocument();
+  $doc->load($xml_filename);
+
+  $xsl_content = new DOMDocument();
+  $xpath = new DOMXPath($doc);
+  if ($doc->lookupPrefix('http://www.sat.gob.mx/cfd/3') == 'cfdi') {
+    // for CFDI
+    $xsl_content_file = drupal_get_path('module', 'cfd') . '/resources/sat/cadenaoriginal_TFD_1_0.xslt';
+    $xpath->registerNamespace('cfd', 'http://www.sat.gob.mx/cfd/3');
+  }
+  else {
+    // in case a CFD (or other incompatible file) was passed
+    return CFDR_IND;
+  }
+
+  $year = substr($xpath->query('/cfd:Comprobante/@fecha')->item(0)->value, 0, 4);
+  $no_certificado_sat = $xpath->query('//tfd:TimbreFiscalDigital/@noCertificadoSAT')->item(0)->value;
+  $sello              = $xpath->query('//tfd:TimbreFiscalDigital/@selloSAT')->item(0)->value;
+  // get cadena original using SAT provided XSLT file.
+  $xsl_content->load($xsl_content_file);
+  $xsl = new XSLTProcessor(); @$xsl->importStylesheet($xsl_content);
+  $cadena_original = $xsl->transformToXml($doc);
+
+  if ($cert = _cfd_get_cert($no_certificado_sat)) {
+    $pub_key = openssl_pkey_get_public($cert);
 
     if ($year <= 2010)
       $v = openssl_verify($cadena_original, base64_decode($sello), $pub_key, OPENSSL_ALGO_MD5);
     else
       $v = openssl_verify($cadena_original, base64_decode($sello), $pub_key, OPENSSL_ALGO_SHA1);
 
-    if ($v == 1) {
-      return 'valido';
-    }
-    else if ($v == 0) {
-      return 'invalido';
-    }
-  } else
-    return 'indeterminado';
+    return $v;
+  }
+  else
+    return CFDR_IND;
+}
+
+/**
+ * Validates xml structure and sello on one swift function
+ * Assumes filename is a valid XML string
+ * @param string $xml path to the .xml file to validate
+ * @return array (result of cfd_validate_schema, result of cfd_validate_sello)
+ */
+function cfd_validate_schema_sello($filename) {
+  $xml = file_get_contents($filename);
+  return array(cfd_validate_schema(&$xml), cfd_validate_sello(&$xml));
 }
 
 /**
@@ -211,6 +306,7 @@ SELECT count(*) as validstatus
 FROM {cfd_certs}
 WHERE no_serie = :noCertificado
 AND RFC = :RFC
+AND edo_cert <> 'R'
 AND :fecha BETWEEN fecha_inicial_cert AND fecha_final_cert;
 SQL;
   $result = db_query($query_string, array(
@@ -221,19 +317,18 @@ SQL;
   return $result['validstatus'];
 }
 
-
 /**
  * Recive un array y regresa una cadena XML de acuerdo a la especificacion
  * @param $cfd_array estructura del array (debe usar estos nombres de 'key'):
  * array(
  *   array(
- *     'RFC'            => '...',
+ *     'emisor_rfc'     => '...',
  *     'serie'          => '...',
  *     'folio'          => '...',
  *     'no_aprobacion'  => '...',
  *     'ano_aprobacion' => '...',
  *     'no_certificado' => '...',
- *     'fecha'          => '...',
+ *     'fecha_cfd'      => '...',
  *   ),
  *   array(...),
  * )
@@ -242,29 +337,30 @@ SQL;
 function _cfd_generate_multi_request_xml($cfds) {
   $ns = 'http://www.sat.gob.mx/Asf/Sicofi/ValidacionFoliosCFD/1.0.0';
   $doc = new DOMDocument('1.0', 'UTF-8');
+  $doc->formatOutput = TRUE;
   $root = $doc->createElementNS($ns, 'ColleccionFoliosCfd');
 
   $count = 1;
   foreach ($cfds as $cfd) {
     //create elements
     $folioC         = $doc->createElementNS($ns, 'Folio');
-    $id             = $doc->createElementNS($ns, 'Id'                      , $count++);
-    $rfc            = $doc->createElementNS($ns, 'Rfc'                     , $cfd['RFC']);
-    $serie          = $doc->createElementNS($ns, 'Serie'                   , $cfd['serie']);
-    $folio          = $doc->createElementNS($ns, 'NumeroFolio'             , $cfd['folio']);
-    $no_aprobacion  = $doc->createElementNS($ns, 'NumeroAprobacion'        , $cfd['no_aprobacion']);
-    $ano_aprobacion = $doc->createElementNS($ns, 'AnioAprobacion'          , $cfd['ano_aprobacion']);
-    $no_certificado = $doc->createElementNS($ns, 'CertificadoNumeroSerie'  , $cfd['no_certificado']);
-    $fecha          = $doc->createElementNS($ns, 'CertificadoFechaEmision' , $cfd['fecha']);
+    $id             = $doc->createElementNS($ns, 'Id'                     , $count++);
+    $emisor_rfc     = $doc->createElementNS($ns, 'Rfc'                    , $cfd['emisor_rfc']);
+    $serie          = $doc->createElementNS($ns, 'Serie'                  , $cfd['serie']);
+    $folio          = $doc->createElementNS($ns, 'NumeroFolio'            , $cfd['folio']);
+    $no_aprobacion  = $doc->createElementNS($ns, 'NumeroAprobacion'       , $cfd['no_aprobacion']);
+    $ano_aprobacion = $doc->createElementNS($ns, 'AnioAprobacion'         , $cfd['ano_aprobacion']);
+    $no_certificado = $doc->createElementNS($ns, 'CertificadoNumeroSerie' , $cfd['no_certificado']);
+    $fecha_cfd      = $doc->createElementNS($ns, 'CertificadoFechaEmision', str_replace(' ', 'T', $cfd['fecha_cfd']));
     //append created elements
     $folioC->appendChild($id);
-    $folioC->appendChild($rfc);
+    $folioC->appendChild($emisor_rfc);
     $folioC->appendChild($serie);
     $folioC->appendChild($folio);
     $folioC->appendChild($no_aprobacion);
     $folioC->appendChild($ano_aprobacion);
     $folioC->appendChild($no_certificado);
-    $folioC->appendChild($fecha);
+    $folioC->appendChild($fecha_cfd);
     //add folioC (folio container) to root
     $root->appendChild($folioC);
   }
@@ -286,7 +382,7 @@ function _cfd_generate_multi_request_xml($cfds) {
 function _cfd_sat_soap_request($xml) {
   $wsdl = 'https://tramitesdigitales.sat.gob.mx/Sicofi.wsExtValidacionCFD/WsValidacionCFDsExt.asmx?WSDL';
   $sat_soap = new SoapClient($wsdl);
-  $response = $sat_soap->ValidarXmlCFD(array('xml' => $validationXML));
+  $response = $sat_soap->ValidarXmlCFD(array('xml' => $xml));
   return $response->ValidarXmlCFDResult;
 }
 
@@ -298,6 +394,7 @@ function _cfd_sat_soap_request($xml) {
  */
 function _cfd_parse_sat_soap_response($xml) {
   $doc = new DOMDocument();
+  // no whitespace so ->nextSibling works as expected.
   $doc->preserveWhiteSpace = FALSE;
   $doc->loadXML($xml);
   $xpath = new DOMXPath($doc);

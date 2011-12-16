@@ -20,13 +20,13 @@ function cfdr_schema() {
       'serie' => array(
         'type' => 'varchar',
         'length' => '10',
-        'not null' => FALSE,
+        'not null' => TRUE,
+        'default' => '',
         'description' => "cfd's series (letters)",      
       ),
       'folio' => array(
-        'type' => 'int',
-        'size' => 'normal',
-        'unsigned' => TRUE,
+        'type' => 'varchar',
+        'length' => '20',
         'not null' => FALSE,
         'description' => "cfd's number",
       ),
@@ -82,6 +82,18 @@ function cfdr_schema() {
         'not null' => FALSE,
         'description' => "Certificate's (CSD) number",
       ),
+      // 'no_certificado_sat' => array(
+      //   'type' => 'varchar',
+      //   'length' => '20',
+      //   'not null' => FALSE,
+      //   'description' => "Certificate's (CSD) number for PAC's cert",
+      // ),
+      'uuid' => array(
+        'type' => 'varchar',
+        'length' => '36',
+        'not null' => FALSE,
+        'description' => "TFD transaction ID",
+      ),
       'xml_filename' => array(
         'type' => 'varchar',
         'length' => '510',
@@ -91,30 +103,26 @@ function cfdr_schema() {
       'validstatus_xml' => array(
         'type' => 'int',
         'size' => 'tiny',
-        'unsigned' => 'true',
         'not null' => FALSE,
         'description' => "Stores the validity status of the CFD's XML structure. NULL means it is not validated yet",
       ),
-      'validstatus_sellos' => array(
+      'validstatus_sello' => array(
         'type' => 'int',
         'size' => 'tiny',
-        'unsigned' => 'true',
         'not null' => FALSE,
         'description' => "Stores the validity status of the CFD's sello. NULL means it is not validated yet",
       ),
       'validstatus_cert' => array(
         'type' => 'int',
         'size' => 'tiny',
-        'unsigned' => 'true',
         'not null' => FALSE,
         'description' => "Stores the validity status of the CFD's certificate. NULL means it is not validated yet",
       ),
       'validstatus_folio' => array(
         'type' => 'int',
         'size' => 'tiny',
-        'unsigned' => 'true',
         'not null' => FALSE,
-        'description' => "Stores the validity status of the CFD's foilo. NULL means it is not validated yet",
+        'description' => "Stores the validity status of the CFD's foilo. NULL means it is not validated yet. For CFDI it stores validity of TFD",
       ),
       'validstatus_sat' => array(
         'type' => 'varchar',
@@ -147,7 +155,13 @@ function cfdr_schema() {
       'date' => array('fecha_cfd'),
       'emisor' => array('emisor_rfc'),
       'receptor' => array('receptor_rfc'),
-      'validstatus' => array('validstatus_xml', 'validstatus_sellos', 'validstatus_cert', 'validstatus_folio'),
+      'validstatus' => array(
+        'validstatus_xml',
+        'validstatus_sello',
+        'validstatus_cert',
+        'validstatus_folio',
+        'validstatus_sat',
+      ),
     ),
   );
   $schema['cfdr_fail'] = array(
