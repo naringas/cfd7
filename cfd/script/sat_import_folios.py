@@ -47,7 +47,7 @@ def get_stats(f, ftp):
 	resp = ftp.sendcmd('MDTM %s' %f) # Ask for file's modification time
 	# parse response into a datetime if response code is 213 - OK file status.
 	if resp[:3] == '213':
-		# substract 6 from hour becuase tzinfo is too complicated and would require pytz
+		# substract 6 from hour because tzinfo is too complicated and would require pytz
 		fmtime = datetime(int(resp[4:8]), int(resp[8:10]), int(resp[10:12]), int(resp[12:14])-6, int(resp[14:16]), int(resp[16:18]))
 		return {'mtime': fmtime, 'size': ftp.size(f)}
 	else:
@@ -153,7 +153,7 @@ def main():
 	# if nothing was downladed and --init wasn't passed then do nothing
 	if must_dl or options.init: # if not (not must_dl and not options.init)
 		if options.verbose:
-			print datetime.now(), 'Importando: ', dl_filename, ' a tabla: ', sql_table
+			print datetime.now(), 'Importando: ', os.path.basename(import_filename), ' a tabla: ', sql_table
 			print cursor.execute(import_sql), ' registros agregados'
 		else:
 			cursor.execute(import_sql)
