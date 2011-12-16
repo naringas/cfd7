@@ -160,7 +160,7 @@ def main():
 
 	newlines = get_newlines(import_filename)
 	import_filename = os.path.abspath(import_filename).replace('\\', r'\\')
-	import_sql = "LOAD DATA INFILE '%s'%sINTO TABLE %s FIELDS TERMINATED BY '|'LINES TERMINATED BY %s IGNORE %i LINES;" \
+	import_sql = "LOAD DATA LOCAL INFILE '%s'%sINTO TABLE %s CHARACTER SET latin1 FIELDS TERMINATED BY '|'LINES TERMINATED BY %s IGNORE %i LINES;" \
 		% (import_filename, replace, sql_table, newlines, ignore_lines)
 
 	# -----SQL-----
