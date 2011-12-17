@@ -205,10 +205,6 @@ function cfdr_token_info() {
     'name' => 'Receptor RFC',
     'description' => 'RFC del receptor',
   );
-  $info['tokens']['cfdr']['anno_mes'] = array(
-    'name' => 'Fecha parcial',
-    'description' => 'Año y mes de emision del CFD',
-  );
   return $info;
 }
 
@@ -228,9 +224,6 @@ function cfdr_tokens($type, $tokens, array $data = array(), array $options = arr
         break;
         case 'receptor_rfc':
           $replacements[$original] = $cfdr->receptor_rfc;
-        break;
-        case 'anno_mes':
-          $replacements[$original] = substr($cfdr->fecha_cfd, 0, 7);
         break;
       }
     }
@@ -1533,7 +1526,6 @@ function cfdr_import_cfd($cfdr) {
   );
   $move_to = variable_get('cfdr_move_path', 'sites/default/cfd/received'); //base directory
   $to_dir  = variable_get('cfdr_move_pattern', '[cfdr:receptor_rfc]/[cfdr:emisor_rfc]/[cfdr_date:Y-m]');
-  // $to_dir  = variable_get('cfdr_move_pattern', '[cfdr:receptor_rfc]/[cfdr:emisor_rfc]/[cfdr:anno_mes]');
 
   // Replace tokens
   // Replace date pattern (regex based on token_scan)
@@ -1558,6 +1550,31 @@ function cfdr_import_cfd($cfdr) {
   }
   else {
     watchdog('cfdr', 'Problema moviendo %file a %new_file.<br/>%type: %serie %folio', array_merge($error_vars, array('%new_file' => $new_filename)), WATCHDOG_ERROR);
+  }
+}
+
+/**
+ * Worker function to import failed XMLs into {cfdr_fail} table.
+ * Also moves the file
+ */
+function cfdr_import_fail($filename) {
+  // watchdog('debug_fail', $filename);
+  $fail_dir = variable_get('cfdr_fail_path', 'sites/default/cfd/fail'); // move failed (non-CFD) XMLs to this dir
+
+  if (!is_dir($fail_dir)) {
+    if (file_prepare_directory($fail_dir, FILE_CREATE_DIRECTORY | FILE_MODIFY_PERMISSIONS))
+      file_create_htaccess($fail_dir);
+  }
+
+  $new_filename = $fail_dir . '/' . basename($filename);
+
+  if (file_unmanaged_move($filename, $new_filename)) {
+    if (!cfdr_save_fail($new_filename)) {
+      watchdog('cfdr', 'Error al instertar archivo XML %new_file', array('%new_file' => $new_filename), WATCHDOG_WARNING);
+    }
+  }
+  else {
+    watchdog('cfdr', 'Error al mover archivo XML %file a %new_file', array('%file' => $filename, '%new_file' => $new_filename), WATCHDOG_WARNING);
   }
 }
 
@@ -1605,30 +1622,5 @@ function cfdr_validate_remote_single($cfdr) {
     drupal_write_record('cfdr', $validstatus_entry, 'cfdr_id');
     drupal_set_message("Se valido $xml_type: $cfdr->serie $cfdr->folio con el servicio del SAT");
     drupal_goto("cfdr/$cfdr->cfdr_id/d");
-  }
-}
-
-/**
- * Worker function to import failed XMLs into {cfdr_fail} table.
- * Also moves the file
- */
-function cfdr_import_fail($filename) {
-  // watchdog('debug_fail', $filename);
-  $fail_dir = variable_get('cfdr_fail_path', 'sites/default/cfd/fail'); // move failed (non-CFD) XMLs to this dir
-
-  if (!is_dir($fail_dir)) {
-    if (file_prepare_directory($fail_dir, FILE_CREATE_DIRECTORY | FILE_MODIFY_PERMISSIONS))
-      file_create_htaccess($fail_dir);
-  }
-
-  $new_filename = $fail_dir . '/' . basename($filename);
-
-  if (file_unmanaged_move($filename, $new_filename)) {
-    if (!cfdr_save_fail($new_filename)) {
-      watchdog('cfdr', 'Error al instertar archivo XML %new_file', array('%new_file' => $new_filename), WATCHDOG_WARNING);
-    }
-  }
-  else {
-    watchdog('cfdr', 'Error al mover archivo XML %file a %new_file', array('%file' => $filename, '%new_file' => $new_filename), WATCHDOG_WARNING);
   }
 }
