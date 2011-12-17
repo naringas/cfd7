@@ -314,56 +314,6 @@ function cfdr_delete_confirm_form_submit($form, &$form_state) {
   $form_state['redirect'] = 'cfdr';
 }
 
-/**DEPRECEATED
- * Loads then reads, then inserts a CFD into de database.
- * @param string $cfdr_filename the full path and name of the CFD's .xml file
- */
-function cfdr_insert($filename) {
-  //parse XML file read (with DOM XML(simpleXML sucks at namespaces))
-  $doc = new DOMDocument();
-  @$doc->load($filename, LIBXML_NOWARNING);
-  $xpath = new DOMXPath($doc);
-  $cfdr = new stdClass();
-  // if we're dealing with CFD (and not CFDi)
-  if ($doc->isDefaultNamespace('http://www.sat.gob.mx/cfd/2')) {
-    $xpath->registerNamespace('cfd', 'http://www.sat.gob.mx/cfd/2');
-    $cfdr->xml_type = CFDR_XML_2;
-  }
-  else if ($doc->lookupPrefix('http://www.sat.gob.mx/cfd/3') == 'cfdi') {
-    $xpath->registerNamespace('cfd', 'http://www.sat.gob.mx/cfd/3');
-    $cfdr->xml_type = CFDR_XML_3;
-  }
-  $fecha_cfd = $xpath->query('/cfd:Comprobante/@fecha');
-  // abort if not on a CFD or CFDI
-  if (!$fecha_cfd->length) return FALSE;
-  $cfdr->fecha_cfd       = $fecha_cfd->item(0)->value;
-  $cfdr->serie           = $xpath->query('/cfd:Comprobante/@serie')->item(0)->value;
-  $cfdr->folio           = $xpath->query('/cfd:Comprobante/@folio')->item(0)->value;
-  $cfdr->no_aprobacion   = $xpath->query('/cfd:Comprobante/@noAprobacion')->item(0)->value;
-  $cfdr->ano_aprobacion  = $xpath->query('/cfd:Comprobante/@anoAprobacion')->item(0)->value;
-  $cfdr->emisor_rfc      = $xpath->query('/cfd:Comprobante/cfd:Emisor/@rfc')->item(0)->value;
-  $cfdr->emisor_nombre   = $xpath->query('/cfd:Comprobante/cfd:Emisor/@nombre')->item(0)->value;
-  $cfdr->receptor_rfc    = $xpath->query('/cfd:Comprobante/cfd:Receptor/@rfc')->item(0)->value;
-  $cfdr->importe         = $xpath->query('/cfd:Comprobante/@total')->item(0)->value;
-  $cfdr->no_certificado  = $xpath->query('/cfd:Comprobante/@noCertificado')->item(0)->value;
-  $cfdr_type             = $xpath->query('/cfd:Comprobante/@tipoDeComprobante')->item(0)->value;
-  $cfdr->xml_filename    = $filename;
-
-  switch ($cfdr_type) {
-    case 'ingreso':
-      $cfdr->cfd_type = CFDR_INGRESO;
-    break;
-    case 'egreso':
-      $cfdr->cfd_type = CFDR_EGRESO;
-    break;
-    case 'traslado':
-      $cfdr->cfd_type = CFDR_TRASLADO;
-    break;
-  }
-
-  return cfdr_save($cfdr);
-}
-
 /**
  * Loads a cfdr object and returns it
  * @param int $cfdr_id Id of the CFD to retreive
@@ -388,26 +338,7 @@ function cfdr_view_cfds() {
   // drupal_set_breadcrumb(array(l(t('Home'), ''), 'Ver XMLs recibidos'));
 
   drupal_add_css('tr.odd:hover,tr.even:hover  {background: #dbe5f1}', array('type' => 'inline'));
-  $js = <<<JS
-function cfdr_ajax_complete(data, status) {
-  jQuery('#throbber-' + this.cfdr_id).remove();
-}
-function cfdr_ajax_success() {
-  jQuery('#cfdr_id-' + this.cfdr_id).css('border-color', 'green');
-}
-function cfdr_ajax_error() {
-  jQuery('#cfdr_id-' + this.cfdr_id).css('border-color', 'red');
-}
-function cfdr_ajax_add_throbber(xhr, settings) {
-  thrb_id = 'throbber-' + settings.cfdr_id;
-  // test if there's a throbber and return false (stop request) if there is
-  if (jQuery('#' + thrb_id).length > 0) {
-    return false;
-  }
-  jQuery('#cfdr_id-' + settings.cfdr_id).after('<div id='+thrb_id+' style="float:none;display: inline-block; vertical-align: text-bottom;;" class="ajax-progress"><div class="throbber">&nbsp;</div></div>');
-}
-JS;
-  drupal_add_js($js, array('type' => 'inline'));
+  drupal_add_js(drupal_get_path('module', 'cfdr') . '/cfdr.cfds.ajax.js', array('type' => 'file'));
 
   $query = db_select('cfdr', 'c')->fields('c');
   $filters = isset($_SESSION['cfdr_filters']) ? $_SESSION['cfdr_filters'] : NULL;
@@ -849,6 +780,7 @@ CSS;
   drupal_add_css($style, array('type' => 'inline'));
  */
 function cfdr_view_single($cfd) {
+  drupal_add_js(drupal_get_path('module', 'cfdr') . '/cfdr.cfds.ajax.js', array('type' => 'file'));
   if (is_null($cfd->validstatus_xml) || is_null($cfd->validstatus_sello) || is_null($cfd->validstatus_cert) || is_null($cfd->validstatus_folio))
     drupal_goto("cfdr/$cfd->cfdr_id/d/validate", array('query' => array('destination' => "/cfdr/$cfd->cfdr_id")));
 
@@ -903,6 +835,7 @@ function cfdr_view_single($cfd) {
   );
 
   //nested table right
+  $ajax_url = url('cfdr/ajax/nav_num');
   $rowsRight = array(
     array(
       array(
@@ -934,7 +867,27 @@ function cfdr_view_single($cfd) {
           'data' => 'Folio NAV',
         ),
         array(
-          'data' => $cfd->nav_number,
+          'data' =>
+          user_access('edit any CFD') ?
+            array('data' => array(
+              '#type' => 'textfield',
+              '#size' => 10,
+              '#value' => $cfd->nav_number,
+              '#attributes' => array(
+                'id' => 'cfdr_id-' . $cfd->cfdr_id,
+                'onchange' => 
+                  "jQuery.ajax({
+                    cfdr_id: '{$cfd->cfdr_id}',
+                    type: 'POST',
+                    url: '{$ajax_url}',
+                    beforeSend: cfdr_ajax_add_throbber,
+                    success: cfdr_ajax_success,
+                    complete: cfdr_ajax_complete,
+                    error: cfdr_ajax_error,
+                    data: {cfdr_id: '{$cfd->cfdr_id}', nav_number: this.value}
+                  });",
+              ),
+            )) : $cfd->nav_number,
         ),
       ),
     ),
@@ -1274,28 +1227,6 @@ function cfdr_view_single_form_submit($form, &$form_state) {
   drupal_write_record('cfdr', $update, 'cfdr_id');
 
 }
-/**DEPRECEATED
- * from DB value to option value
- * @return $valid as an option:
- *  0-FALSE into 2
- *  1-TRUE into 0
- *  NULL into 1
- */
-function _cfdr_valid2option($valid) {
-  if (isset($valid)) {
-    switch ($valid) {
-    case FALSE:
-      $valid = 2; //TRUE
-    break;
-    case TRUE:
-      $valid = 0; //FALSE
-    break;
-    }
-  } else
-    $valid = 1;
-
-  return $valid;
-}
 
 /**
  * Theme for cfdr_view_single_form fieldset
@@ -1416,20 +1347,36 @@ function cfdr_validstatus_overview(&$cfd) {
     return l(cfdr_validstatus_image(CFDR_IND) . '&nbsp;&nbsp;Validar', "/cfdr/$cfd->cfdr_id/d/validate",
       array('html' => TRUE, 'query' => array('destination' => "/cfdr/$cfd->cfdr_id")));
   }
-  else if ($cfd->validstatus_xml == CFDR_VALID &&
-      $cfd->validstatus_sello == CFDR_VALID &&
-      $cfd->validstatus_cert  == CFDR_VALID &&
-      $cfd->validstatus_folio == CFDR_VALID) {
-          return cfdr_validstatus_image(CFDR_VALID);
-        }
-  else if ($cfd->validstatus_xml == CFDR_IND ||
-      $cfd->validstatus_sello == CFDR_IND ||
-      $cfd->validstatus_cert  == CFDR_IND ||
-      $cfd->validstatus_folio == CFDR_IND) {
-          return cfdr_validstatus_image(CFDR_IND);
-        }
-  else
+  else if 
+    ($cfd->validstatus_xml  == CFDR_VALID &&
+    $cfd->validstatus_sello == CFDR_VALID &&
+    $cfd->validstatus_cert  == CFDR_VALID &&
+    $cfd->validstatus_folio == CFDR_VALID)
+  {
+    return cfdr_validstatus_image(CFDR_VALID);
+  }
+  else if 
+    ($cfd->validstatus_xml  == CFDR_INVALID ||
+    $cfd->validstatus_sello == CFDR_INVALID ||
+    $cfd->validstatus_cert  == CFDR_INVALID ||
+    $cfd->validstatus_folio == CFDR_INVALID)
+  {
     return cfdr_validstatus_image(CFDR_INVALID);
+  }
+  else if 
+    ($cfd->validstatus_xml  == CFDR_INVALID ||
+    $cfd->validstatus_sello == CFDR_INVALID ||
+    $cfd->validstatus_cert  == CFDR_INVALID ||
+    $cfd->validstatus_folio == CFDR_INVALID ||
+    is_null($cfd->validstatus_xml) ||
+    is_null($cfd->validstatus_sello) ||
+    is_null($cfd->validstatus_cert) ||
+    is_null($cfd->validstatus_folio))
+  {
+    return cfdr_validstatus_image(CFDR_INVALID);
+  }
+  else
+    return '?';
 }
 
 /**
@@ -1636,7 +1583,7 @@ function cfdr_validate($cfdr) {
   }
   drupal_write_record('cfdr', $cfdr, 'cfdr_id');
   drupal_set_message("Se valido $xml_type: $cfdr->serie $cfdr->folio");
-  drupal_goto($_GET['destination'] ? $_GET['destination'] : "cfdr/$cfdr->cfdr_id/d");
+  drupal_goto(isset($_GET['destination']) ? $_GET['destination'] : "cfdr/$cfdr->cfdr_id/d");
 }
 
 /**
@@ -1684,40 +1631,4 @@ function cfdr_import_fail($filename) {
   else {
     watchdog('cfdr', 'Error al mover archivo XML %file a %new_file', array('%file' => $filename, '%new_file' => $new_filename), WATCHDOG_WARNING);
   }
-}
-
-/**DEPRECEATED
- * Scans for .xml cfds in configured directory and moves XML CFDs into $to_dir
- * $to_dir is named MMYYYY so it groups CFDs
- */
-function cfdr_scan() {
-  $scan_path = variable_get('cfdr_scan_path', 'sites/default/cfd/new'); // new XMLs directory
-  $fail_path = variable_get('cfdr_fail_path', 'sites/default/cfd/fail'); // move failed (non-CFD) XMLs to this dir
-  $move_to   = variable_get('cfdr_move_path', 'sites/default/cfd/received'); //base directory
-
-  $to_dir = date('Ym'); //monthly directory
-
-  $move_path = $move_to . '/_-_RFC_-_/' . $to_dir; //move CFDs into here
-
-  if ($files = file_scan_directory($scan_path, '/.*\.(xml|XML)$/')) {
-    $count = 0;
-    if (!is_dir($move_path)) {
-      if (file_prepare_directory($move_path, FILE_CREATE_DIRECTORY | FILE_MODIFY_PERMISSIONS))
-        file_create_htaccess($move_path);
-    }
-    foreach ($files as $file) {
-      $new_filename = $move_path . '/' . $file->filename;
-      if ($resulting_fileuri = file_unmanaged_move($file->uri, $new_filename)) {
-        // add entry to {cfdr} from .xml file
-        if (cfdr_insert($resulting_fileuri)) {
-          $count++;
-        }
-        else {
-          file_unmanaged_move($resulting_fileuri, $fail_path . '/' . basename($resulting_fileuri));
-        }
-      }
-    }
-  }
-  if ($count > 0)
-    watchdog('cfdr', '@count files imported succesfully', array('@count' => $count), WATCHDOG_NOTICE);
 }
