@@ -975,7 +975,7 @@ function cfdr_view_single($cfd) {
         array(
           // 'style' => 'vertical-align: bottom;',
           // 'class' => (substr($sat_valid[1], 1, 1) == 'V') ? 'validstatusG' : 'validstatusR',
-          'data' => cfdr_validstatus_overview(&$cfd),
+          'data' => cfdr_validstatus_overview($cfd),
         ),
       ),
     )
@@ -1439,7 +1439,7 @@ function cfdr_validstatus_overview(&$cfd) {
  */
 function cfdr_save_fail($uri) {
   $record = array('xml_filename' => $uri);
-  return drupal_write_record('cfdr_fail', &$record);
+  return drupal_write_record('cfdr_fail', $record);
 }
 
 /**
@@ -1549,14 +1549,6 @@ function cfdr_import_load_cfd($uri) {
   return $cfdr;
 }
 
-/**DEPRECEATED
- * 
- */
-function cfdr_import($cfdr) {
-  cfdr_import_cfd(&$cfdr);
-  cfdr_validate(&$cfdr);
-}
-
 /**
  * Pair of functions for currying
  * USED in cfdr_import_cfd to tokenize the cfd's date
@@ -1654,8 +1646,8 @@ function cfdr_validate_remote_single($cfdr) {
   $xml_type = _cfdr_xml_type_to_str($cfdr->xml_type);
   if ($xml_type == 'CFD') {
     $xml = _cfd_generate_multi_request_xml(array((array) $cfdr));
-    $raw_response = _cfd_sat_soap_request(&$xml);
-    $response = _cfd_parse_sat_soap_response(&$raw_response);
+    $raw_response = _cfd_sat_soap_request($xml);
+    $response = _cfd_parse_sat_soap_response($raw_response);
     // dpm($xml);
     // dpm($raw_response);
     // dpm($response);

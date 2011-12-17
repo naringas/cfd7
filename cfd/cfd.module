@@ -95,7 +95,7 @@ function cfd_make_pdf($xml) {
  * @param string $xml data to validate
  * @return bool CFDR_VALID or CFDR_INVALID
  */
-function cfd_validate_schema($xml) {
+function cfd_validate_schema(&$xml) {
   $doc = new DOMDocument();
   $doc->loadXML($xml);
 
@@ -170,7 +170,7 @@ function _cfd_get_cert($no_serie) {
  * @param string $xml The xml string of the CFD to validate
  * @return int CFDR_IND, CFDR_VALID, or CFDR_INVALID
  **/
-function cfd_validate_sello($xml) {
+function cfd_validate_sello(&$xml) {
   $doc = new DOMDocument();
   $doc->loadXML($xml);
 
@@ -272,7 +272,7 @@ function cfd_validate_tfd($xml_filename) {
  */
 function cfd_validate_schema_sello($filename) {
   $xml = file_get_contents($filename);
-  return array(cfd_validate_schema(&$xml), cfd_validate_sello(&$xml));
+  return array(cfd_validate_schema($xml), cfd_validate_sello($xml));
 }
 
 /**
@@ -380,7 +380,7 @@ function _cfd_generate_multi_request_xml($cfds) {
  *  se espera que sea genrado con _cfd_generate_multi_request_xml(...)
  * @return stirng $xml
  */
-function _cfd_sat_soap_request($xml) {
+function _cfd_sat_soap_request(&$xml) {
   $wsdl = 'https://tramitesdigitales.sat.gob.mx/Sicofi.wsExtValidacionCFD/WsValidacionCFDsExt.asmx?WSDL';
   $sat_soap = new SoapClient($wsdl);
   $response = $sat_soap->ValidarXmlCFD(array('xml' => $xml));
@@ -393,7 +393,7 @@ function _cfd_sat_soap_request($xml) {
  * @return array con Id como key y codigo de validacion del SAT como valor
  *  array('1' => 'VV', '2' => 'IV', ...)
  */
-function _cfd_parse_sat_soap_response($xml) {
+function _cfd_parse_sat_soap_response(&$xml) {
   $doc = new DOMDocument();
   // no whitespace so ->nextSibling works as expected.
   $doc->preserveWhiteSpace = FALSE;
