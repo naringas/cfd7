@@ -35,15 +35,6 @@ function cfdr_menu() {
     'access arguments' => array('view any CFD'),
     'weight' => 0,
   );
-  $menu['cfdr/fail'] = array(
-    'type' => MENU_LOCAL_TASK,
-    'title' => 'Ver XMLs fallidos',
-    'description' => 'Ver los archivos XML mal formados o que no son facturas',
-    'access callback' => 'user_access',
-    'access arguments' => array('view any CFD'),
-    'page callback' => 'cfdr_view_fail',
-    'weight' => 2,
-  );
   // HTML view
   $menu['cfdr/%cfdr'] = array(
     'type' => MENU_CALLBACK,
@@ -112,7 +103,7 @@ function cfdr_menu() {
     'access arguments' => array('view any CFD'),
     'page callback' => 'cfdr_display_xml',
     'page arguments' => array(1),
-   'weight' => 2,
+    'weight' => 2,
  );
   $menu['cfdr/%/pdf'] = array(
     'type' => MENU_CALLBACK | MENU_LOCAL_ACTION,
@@ -140,6 +131,38 @@ function cfdr_menu() {
      'page callback' => '_cfdr_nav_number_update_ajax',
      'access callback' => 'user_access',
      'access arguments' => array('edit any CFD'),
+  );
+  $menu['cfdr/ajax/validate'] = array(
+    'title' => t('cfdr validation AJAX'),
+     'type' => MENU_CALLBACK,
+     'page callback' => '_cfdr_validate_ajax',
+     'access callback' => 'user_access',
+     'access arguments' => array('view any CFD'),
+  );
+  $menu['cfdr/fail'] = array(
+    'type' => MENU_LOCAL_TASK,
+    'title' => 'Ver XMLs fallidos',
+    'description' => 'Ver los archivos XML mal formados o que no son facturas',
+    'access callback' => 'user_access',
+    'access arguments' => array('view any CFD'),
+    'page callback' => 'cfdr_view_fail',
+    'weight' => 2,
+  );
+  $menu['cfdr/fail/%cfdr_fail_filename/txt'] = array(
+    'type' => MENU_CALLBACK,
+    'title' => 'Ver Archivo',
+    'access callback' => 'user_access',
+    'access arguments' => array('view failed'),
+    'page callback' => '_cfdr_display_txt',
+    'page arguments' => array(2),
+  );
+  $menu['cfdr/fail/%cfdr_fail_filename/dl'] = array(
+    'type' => MENU_CALLBACK,
+    'title' => 'Descargar Archivo',
+    'access callback' => 'user_access',
+    'access arguments' => array('view failed'),
+    'page callback' => '_cfdr_download_txt',
+    'page arguments' => array(2),
   );
   return $menu;
 }
@@ -181,6 +204,10 @@ function cfdr_permission() {
     'delete any CFD' => array(
       'title' => t('Delete CFDs'),
       'description' => t('Allows role to delete any CFD'),
+    ),
+    'view failed' => array(
+      'title' => t('Ver fallidos'),
+      'description' => t('Allows role to view any non-CFD'),
     ),
   );
 }
@@ -328,9 +355,28 @@ function cfdr_load_filename($cfdr_id) {
  * 'cfdr' menu entry callback
  */
 function cfdr_view_cfds() {
-  // drupal_set_breadcrumb(array(l(t('Home'), ''), 'Ver XMLs recibidos'));
-
   drupal_add_css('tr.odd:hover,tr.even:hover  {background: #dbe5f1}', array('type' => 'inline'));
+  $js = <<<JS
+function cfdr_ajax_v_complete() {
+  // jQuery('#v-cfdr_id-' + this.cfdr_id + ' img').show();
+}
+function cfdr_ajax_v_success(e, xhr, settings) {
+  var i = jQuery('#v-cfdr_id-' + this.cfdr_id).removeAttr('onclick');
+  jQuery('img', i).remove();
+  jQuery('#v-throbber-' + this.cfdr_id).replaceWith(e[1].data);
+}
+function cfdr_ajax_v_add_throbber(xhr, settings) {
+  thrb_id = 'v-throbber-' + settings.cfdr_id;
+  // test if there's a throbber and return false (stop request) if there is
+  if (jQuery('#' + thrb_id).length > 0) {
+    return false;
+  }
+  // jQuery('#v-cfdr_id-' + this.cfdr_id + ' img').hide();
+  jQuery('#v-cfdr_id-' + this.cfdr_id + ' img').remove();
+  jQuery('#v-cfdr_id-' + settings.cfdr_id).append('<div id=' + thrb_id + ' style="float:none;display: inline-block; vertical-align: text-bottom;;" class="ajax-progress"><div class="throbber">&nbsp;</div></div>');
+}
+JS;
+  drupal_add_js($js, array('type' => 'inline'));
   drupal_add_js(drupal_get_path('module', 'cfdr') . '/cfdr.cfds.ajax.js', array('type' => 'file'));
 
   $query = db_select('cfdr', 'c')->fields('c');
@@ -426,6 +472,7 @@ function cfdr_view_cfds() {
 
   $header = array(
     '',
+    '',
     array('data' =>   'Serie'    , 'field' => 'serie'),
     array('data' =>   'Folio'    , 'field' => 'folio'),
     array('data' => t('Emisor')  , 'field' => 'emisor_rfc'),
@@ -440,8 +487,10 @@ function cfdr_view_cfds() {
 
   $rows = array();
   foreach ($results as $cfd) {
+    $validity = cfdr_validstatus_overview($cfd);
     $fecha = new DateObject($cfd->fecha_cfd, date_default_timezone(), DATE_FORMAT_DATETIME);
     $ajax_url = url('cfdr/ajax/nav_num');
+    $ajax_v_url = url('cfdr/ajax/validate');
     $rows[] = array(
       'data' => array(
         l(t('View'), "cfdr/{$cfd->cfdr_id}", array(
@@ -449,6 +498,22 @@ function cfdr_view_cfds() {
             'ondblclick' => "javascript:window.location = 'cfdr/{$cfd->cfdr_id}/d';",
           )
         )),
+        $validity == CFDR_IND ?
+          array(
+            'data' => '<span style="cursor:pointer">' . cfdr_validstatus_image($validity) . '</span>',
+            'id' => 'v-cfdr_id-' . $cfd->cfdr_id,
+            'onclick' =>
+                "jQuery.ajax({
+                  cfdr_id: '{$cfd->cfdr_id}',
+                  type: 'POST',
+                  url: '{$ajax_v_url}',
+                  beforeSend: cfdr_ajax_v_add_throbber,
+                  success: cfdr_ajax_v_success,
+                  //complete: cfdr_ajax_v_complete,
+                  //error: cfdr_ajax_error,
+                  data: {cfdr_id: '{$cfd->cfdr_id}'}
+                });")
+          : cfdr_validstatus_image($validity),
         $cfd->serie,
         $cfd->folio,
         (strlen($cfd->emisor_nombre) >=50)
@@ -456,7 +521,6 @@ function cfdr_view_cfds() {
           : $cfd->emisor_nombre,
         format_date($fecha->format(DATE_FORMAT_UNIX), 'custom', 'j M Y'),
         array('data' => '$' . number_format($cfd->importe, 2), 'style' => 'text-align:right;'),
-        // TODO check if we have permission to edit this
         // $cfd->nav_number,
         user_access('edit any CFD') && is_null($cfd->nav_number) ? 
           array('data' => array(
@@ -921,7 +985,7 @@ function cfdr_view_single($cfd) {
         array(
           // 'style' => 'vertical-align: bottom;',
           // 'class' => (substr($sat_valid[1], 1, 1) == 'V') ? 'validstatusG' : 'validstatusR',
-          'data' => cfdr_validstatus_overview($cfd),
+          'data' => cfdr_validstatus_image(cfdr_validstatus_overview($cfd)),
         ),
       ),
     )
@@ -1251,8 +1315,7 @@ function cfdr_download_xml($cfdr_id) {
   // Transfer file in 1024 byte chunks to save memory usage.
   if ($fd = fopen($filename, 'rb')) {
     drupal_add_http_header('Content-Description', 'File Transfer');
-    drupal_add_http_header('Content-Disposition',  'attachment; filename='.$basename, TRUE);
-    // drupal_add_http_header('Content-Disposition',  'inline; filename='.$basename);
+    drupal_add_http_header('Content-Disposition', 'attachment; filename='.$basename, TRUE);
     drupal_add_http_header('Content-type', 'text/xml', TRUE);
     while (!feof($fd)) {
       print fread($fd, 1024);
@@ -1270,8 +1333,37 @@ function cfdr_download_xml($cfdr_id) {
  * @param StdObject $node
  */
 function cfdr_display_xml($cfdr_id) {
-  _cfdr_display_txt(cfdr_load_filename($cfdr_id));
+  _cfdr_display_xml(cfdr_load_filename($cfdr_id));
 }
+
+/**
+ * Returns file in $filename for in-browser display
+ */
+function _cfdr_display_xml($filename) {
+  $basename = basename($filename);
+
+  // Code based on file_transfer() but modified to serve files outside the
+  // drupal file system
+  if (ob_get_level()) {
+    ob_end_clean();
+  }
+
+  // Transfer file in 1024 byte chunks to save memory usage.
+  if ($fd = fopen($filename, 'rb')) {
+    drupal_add_http_header('Content-Description', 'File Transfer');
+    drupal_add_http_header('Content-Disposition', 'inline; filename='.$basename, TRUE);
+    drupal_add_http_header('Content-type', 'text/xml; charset=utf-8', TRUE);
+    while (!feof($fd)) {
+      print fread($fd, 1024);
+    }
+    fclose($fd);
+  }
+  else {
+    drupal_not_found();
+  }
+  exit();
+}
+
 /**
  * Returns file in $filename for in-browser display
  */
@@ -1287,8 +1379,36 @@ function _cfdr_display_txt($filename) {
   // Transfer file in 1024 byte chunks to save memory usage.
   if ($fd = fopen($filename, 'rb')) {
     drupal_add_http_header('Content-Description', 'File Transfer');
-    drupal_add_http_header('Content-Disposition',  'inline; filename='.$basename, TRUE);
+    drupal_add_http_header('Content-Disposition', 'inline; filename='.$basename, TRUE);
     drupal_add_http_header('Content-type', 'text/plain; charset=utf-8', TRUE);
+    while (!feof($fd)) {
+      print fread($fd, 1024);
+    }
+    fclose($fd);
+  }
+  else {
+    drupal_not_found();
+  }
+  exit();
+}
+
+/**
+ * Returns the txt file for download.
+ */
+function _cfdr_download_txt($filename) {
+  $basename = basename($filename);
+
+  // Code based on file_transfer() but modified to serve files outside the
+  // drupal file system
+  if (ob_get_level()) {
+    ob_end_clean();
+  }
+
+  // Transfer file in 1024 byte chunks to save memory usage.
+  if ($fd = fopen($filename, 'rb')) {
+    drupal_add_http_header('Content-Description', 'File Transfer');
+    drupal_add_http_header('Content-Disposition', 'attachment; filename='.$basename, TRUE);
+    drupal_add_http_header('Content-type', 'text/plain', TRUE);
     while (!feof($fd)) {
       print fread($fd, 1024);
     }
@@ -1323,50 +1443,55 @@ function cfdr_validstatus_image($status) {
       break;
     case CFDR_VALID:
       return theme('image', array('path'=>'misc/watchdog-ok.png', 'attributes' => array(
-        'style' => 'vertical-align: bottom;', 'title'=>'Valido')));
+        'style' => 'vertical-align: bottom;', 'title'=>'Válido')));
       break;
     case CFDR_INVALID:
       return theme('image', array('path'=>'misc/watchdog-error.png', 'attributes' => array(
-        'style' => 'vertical-align: bottom;', 'title'=>'Invalido')));
+        'style' => 'vertical-align: bottom;', 'title'=>'Inválido')));
       break;
   }
 }
 
 /**
- * Returns an icon
+ * Takes 4 validstatus_* and returns just one
+ * @param stdObject $cfd (by reference) CFD to examine
+ * @return one of CFDR_VALID (if all validstatus are valid),
+ *   CFDR_INVALID (if any validstatus is invalid),
+ *   or CFDR_IND (if any validastaus is NULL or indeterminate)
  */
 function cfdr_validstatus_overview(&$cfd) {
+  /*
   if (is_null($cfd->validstatus_xml) || is_null($cfd->validstatus_sello) || is_null($cfd->validstatus_cert) || is_null($cfd->validstatus_folio)) {
-    return l(cfdr_validstatus_image(CFDR_IND) . '&nbsp;&nbsp;Validar', "/cfdr/$cfd->cfdr_id/d/validate",
-      array('html' => TRUE, 'query' => array('destination' => "/cfdr/$cfd->cfdr_id")));
+    return l(cfdr_validstatus_image(CFDR_IND) . '&nbsp;&nbsp;Validar', "/cfdr/$cfd->cfdr_id/d/validate", array('html' => TRUE, 'query' => array('destination' => "/cfdr/$cfd->cfdr_id")));
   }
-  else if 
+  else */
+  if
+    (is_null($cfd->validstatus_xml) ||
+    is_null($cfd->validstatus_sello) ||
+    is_null($cfd->validstatus_cert) ||
+    is_null($cfd->validstatus_folio ||
+    $cfd->validstatus_xml  == CFDR_IND ||
+    $cfd->validstatus_sello == CFDR_IND ||
+    $cfd->validstatus_cert  == CFDR_IND ||
+    $cfd->validstatus_folio == CFDR_IND))
+  {
+    return CFDR_IND;
+  }
+  else if
     ($cfd->validstatus_xml  == CFDR_VALID &&
     $cfd->validstatus_sello == CFDR_VALID &&
     $cfd->validstatus_cert  == CFDR_VALID &&
     $cfd->validstatus_folio == CFDR_VALID)
   {
-    return cfdr_validstatus_image(CFDR_VALID);
+    return CFDR_VALID;
   }
-  else if 
+  else if
     ($cfd->validstatus_xml  == CFDR_INVALID ||
     $cfd->validstatus_sello == CFDR_INVALID ||
     $cfd->validstatus_cert  == CFDR_INVALID ||
     $cfd->validstatus_folio == CFDR_INVALID)
   {
-    return cfdr_validstatus_image(CFDR_INVALID);
-  }
-  else if 
-    ($cfd->validstatus_xml  == CFDR_INVALID ||
-    $cfd->validstatus_sello == CFDR_INVALID ||
-    $cfd->validstatus_cert  == CFDR_INVALID ||
-    $cfd->validstatus_folio == CFDR_INVALID ||
-    is_null($cfd->validstatus_xml) ||
-    is_null($cfd->validstatus_sello) ||
-    is_null($cfd->validstatus_cert) ||
-    is_null($cfd->validstatus_folio))
-  {
-    return cfdr_validstatus_image(CFDR_INVALID);
+    return CFDR_INVALID;
   }
   else
     return '?';
@@ -1383,12 +1508,34 @@ function cfdr_save_fail($uri) {
 }
 
 /**
- *
+ * callback for 'cdfr/fail'
  */
 function cfdr_view_fail() {
   drupal_add_css('tr.odd:hover,tr.even:hover  {background: #dbe5f1}', array('type' => 'inline'));
+  $fail_dir = variable_get('cfdr_fail_path', 'sites/default/cfd/fail'); // move failed (non-CFD) XMLs to this dir
+  $header = array(
+    'Ver',
+    "Archivo - $fail_dir/a",
+  );
+  // $query = db_query('SELECT xml_filename from {cfdr_fail}');
+  $query = db_select('cfdr_fail', 'cf')->fields('cf');
+  $query = $query->extend('PagerDefault')->limit(50);
+  $results = $query->execute();
 
-  return 'próximamente...';
+  $rows = array();
+  foreach ($results as $file) {
+    $rows[] = array(
+        l('Ver', "cfdr/fail/$file->id/txt", array('attributes' => array('target'=>'_blank'))) . ' | ' .
+          l('dl', "cfdr/fail/$file->id/dl", array('attributes' => array('target'=>'_blank'))),
+        str_replace($fail_dir.'/', '', $file->xml_filename),
+    );
+  }
+  return theme('table', array('header' => $header, 'rows' => $rows, 'empty' => t('None available.'))) .
+    theme('pager', array('tags' => array()));
+}
+
+function cfdr_fail_filename_load($fail_id) {
+  return db_query('SELECT xml_filename from {cfdr_fail} WHERE id=?', array($fail_id))->fetchField();
 }
 
 /**
@@ -1582,7 +1729,6 @@ function cfdr_import_fail($filename) {
  * 
  */
 function cfdr_validate($cfdr) {
-  // watchdog('cfdr-debu', "validar $cfdr->xml_filename");
   $xml_type = _cfdr_xml_type_to_str($cfdr->xml_type);
   $struct_sello = cfd_validate_schema_sello($cfdr->xml_filename);
   if ($xml_type == 'CFD') {
@@ -1622,5 +1768,34 @@ function cfdr_validate_remote_single($cfdr) {
     drupal_write_record('cfdr', $validstatus_entry, 'cfdr_id');
     drupal_set_message("Se valido $xml_type: $cfdr->serie $cfdr->folio con el servicio del SAT");
     drupal_goto("cfdr/$cfdr->cfdr_id/d");
+  }
+}
+
+/**
+ * callback for cfdr/ajax/validate
+ */
+function _cfdr_validate_ajax($cfdr) {
+  $cfdr_id    = $_POST['cfdr_id'];
+  if (!(is_numeric($cfdr_id))) // if either is not numeric
+    drupal_add_http_header('Status', '400 Bad Request', FALSE);
+  else { //both are numeric
+    $cfdr = cfdr_load($cfdr_id);
+    $xml_type = _cfdr_xml_type_to_str($cfdr->xml_type);
+    $struct_sello = cfd_validate_schema_sello($cfdr->xml_filename);
+    if ($xml_type == 'CFD') {
+      $cfdr->validstatus_xml   = $struct_sello[0];
+      $cfdr->validstatus_sello = $struct_sello[1];
+      $cfdr->validstatus_cert  = cfd_validate_cert($cfdr->no_certificado, $cfdr->emisor_rfc, $cfdr->fecha_cfd);
+      $cfdr->validstatus_folio = cfd_validate_folio($cfdr->serie, $cfdr->folio, $cfdr->no_aprobacion, $cfdr->ano_aprobacion, $cfdr->emisor_rfc);
+    }
+    elseif ($xml_type = 'CFDI') {
+      $cfdr->validstatus_xml   = $struct_sello[0];
+      $cfdr->validstatus_sello = $struct_sello[1];
+      $cfdr->validstatus_cert  = cfd_validate_cert($cfdr->no_certificado, $cfdr->emisor_rfc, $cfdr->fecha_cfd);
+      $cfdr->validstatus_folio = cfd_validate_tfd($cfdr->xml_filename);
+    }
+    drupal_write_record('cfdr', $cfdr, 'cfdr_id');
+    // drupal_add_http_header('Content-Type', 'text/plain', FALSE);
+    return ajax_deliver(cfdr_validstatus_image(cfdr_validstatus_overview($cfdr)));
   }
 }
