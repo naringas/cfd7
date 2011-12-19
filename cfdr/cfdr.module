@@ -1515,7 +1515,7 @@ function cfdr_view_fail() {
   $fail_dir = variable_get('cfdr_fail_path', 'sites/default/cfd/fail'); // move failed (non-CFD) XMLs to this dir
   $header = array(
     'Ver',
-    "Archivo - $fail_dir/a",
+    "Archivo - $fail_dir/",
   );
   // $query = db_query('SELECT xml_filename from {cfdr_fail}');
   $query = db_select('cfdr_fail', 'cf')->fields('cf');
