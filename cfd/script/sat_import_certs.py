@@ -70,7 +70,11 @@ def get_stats(f, ftp):
 	# parse response into a datetime if response code is 213 - OK file status.
 	if resp[:3] == '213':
 		# substract 6 from hour becuase tzinfo is too complicated and would require pytz
-		fmtime = datetime(int(resp[4:8]), int(resp[8:10]), int(resp[10:12]), int(resp[12:14])-6, int(resp[14:16]), int(resp[16:18]))
+		if int(resp[12:14])-6 < 0:
+			fmtime = datetime(int(resp[4:8]), int(resp[8:10]), int(resp[10:12])-1, (int(resp[12:14])-6)%24, int(resp[14:16]), int(resp[16:18]))
+		else:
+			fmtime = datetime(int(resp[4:8]), int(resp[8:10]), int(resp[10:12]), int(resp[12:14])-6, int(resp[14:16]), int(resp[16:18]))
+
 		return {'mtime': fmtime, 'size': ftp.size(f)}
 	else:
 		raise error_reply('Error FTP: Respuesta insperada')
