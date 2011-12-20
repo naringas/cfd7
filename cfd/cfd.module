@@ -307,7 +307,6 @@ SELECT count(*) as validstatus
 FROM {cfd_certs}
 WHERE no_serie = :noCertificado
 AND RFC = :RFC
-AND edo_cert <> 'R'
 AND :fecha BETWEEN fecha_inicial_cert AND fecha_final_cert;
 SQL;
   $result = db_query($query_string, array(
