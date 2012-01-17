@@ -2,3 +2,6 @@ cfd/resources/sat/*
 cfd/script/sat_files/
 *pyc
 cfd/script/progressbar.*
+cfd/chkemail/*/
+cfd/chkemail/*.ini
+!cfd/chkemail/distribute.ini
