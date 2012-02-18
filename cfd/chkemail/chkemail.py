@@ -167,7 +167,7 @@ def main():
 				zipped = ZipFile(tmp_zip)
 				for f_info in zipped.infolist():
 					if f_info.filename[-4:].lower() == '.xml':
-						xml_filename =  generate_filename(f_info.filename)
+						xml_filename =  generate_filename(os.path.basename(f_info.filename))
 						xml_file = open(xml_filename, 'wb')
 						xml_file.write(zipped.read(f_info))
 						xml_file.close()
