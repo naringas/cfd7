@@ -98,20 +98,24 @@ function cfd_make_pdf($xml) {
 function cfd_validate_schema(&$xml) {
   $doc = new DOMDocument();
   $doc->loadXML($xml);
+  $xpath = new DOMXPath($doc);
 
   // gather problem nodes: Addenda, Complemento
   $doc_el = $doc->documentElement;
+
   $addenda_list     = $doc_el->getElementsByTagName('Addenda');
   $complemento_list = $doc_el->getElementsByTagName('Complemento');
 
   if ($doc->isDefaultNamespace('http://www.sat.gob.mx/cfd/2')) {
-    $schemaFileName = drupal_get_path('module', 'cfd') . '/resources/sat/cfdv2.xsd';
     foreach($complemento_list as $complemento) {
       $doc_el->removeChild($complemento);
     }
+    // $schemaFileName = drupal_get_path('module', 'cfd') . '/resources/sat/cfdv2.xsd';
+    $xpath->registerNamespace('cfd', 'http://www.sat.gob.mx/cfd/2');
   }
-  else if ($doc->lookupPrefix('http://www.sat.gob.mx/cfd/3') == 'cfdi') {
-    $schemaFileName = drupal_get_path('module', 'cfd') . '/resources/sat/cfdv3_con_tfd.xsd';
+  else if ($doc->isDefaultNamespace('http://www.sat.gob.mx/cfd/3') || $doc->lookupPrefix('http://www.sat.gob.mx/cfd/3') == 'cfdi') {
+    // $schemaFileName = drupal_get_path('module', 'cfd') . '/resources/sat/cfdv3_con_tfd.xsd';
+    $xpath->registerNamespace('cfd', 'http://www.sat.gob.mx/cfd/3');
   }
 
   //remove the problem nodes
@@ -119,7 +123,25 @@ function cfd_validate_schema(&$xml) {
     $doc_el->removeChild($addenda);
   }
 
+  switch ($xpath->query('/cfd:Comprobante/@version')->item(0)->value) {
+    case '2.0':
+      $schemaFileName = drupal_get_path('module', 'cfd') . '/resources/sat/cfdv2.xsd';
+      break;
+    case '2.2':
+      $schemaFileName = drupal_get_path('module', 'cfd') . '/resources/sat/cfdv2.xsd';
+      break;
+    case '3.0':
+      $schemaFileName = drupal_get_path('module', 'cfd') . '/resources/sat/cfdv3_con_tfd.xsd';
+      break;
+    case '3.2':
+      $schemaFileName = drupal_get_path('module', 'cfd') . '/resources/sat/cfdv3_con_tfd.xsd';
+      break;
+    default:
+      return FALSE;
+  }
+
   $validcfd = @$doc->schemaValidate($schemaFileName);
+  // $validcfd = $doc->schemaValidate($schemaFileName);
   return $validcfd;
 }
 
@@ -181,7 +203,7 @@ function cfd_validate_sello(&$xml) {
     $xsl_content_file = drupal_get_path('module', 'cfd') . '/resources/sat/cadenaoriginal_2_0.xslt';
     $xpath->registerNamespace('cfd', 'http://www.sat.gob.mx/cfd/2');
   }
-  else if ($doc->lookupPrefix('http://www.sat.gob.mx/cfd/3') == 'cfdi') {
+  else if ($doc->isDefaultNamespace('http://www.sat.gob.mx/cfd/3') || $doc->lookupPrefix('http://www.sat.gob.mx/cfd/3') == 'cfdi') {
     // for CFDI
     $xsl_content_file = drupal_get_path('module', 'cfd') . '/resources/sat/cadenaoriginal_3_0.xslt';
     $xpath->registerNamespace('cfd', 'http://www.sat.gob.mx/cfd/3');
@@ -223,7 +245,7 @@ function cfd_validate_sello(&$xml) {
 }
 
 /**
- * Validates the TFD of a CFDR_IND
+ * Validates the TFD of a CFDI
  */
 function cfd_validate_tfd($xml_filename) {
   $doc = new DOMDocument();
@@ -231,7 +253,7 @@ function cfd_validate_tfd($xml_filename) {
 
   $xsl_content = new DOMDocument();
   $xpath = new DOMXPath($doc);
-  if ($doc->lookupPrefix('http://www.sat.gob.mx/cfd/3') == 'cfdi') {
+  if ($doc->isDefaultNamespace('http://www.sat.gob.mx/cfd/3') || $doc->lookupPrefix('http://www.sat.gob.mx/cfd/3') == 'cfdi') {
     // for CFDI
     $xsl_content_file = drupal_get_path('module', 'cfd') . '/resources/sat/cadenaoriginal_TFD_1_0.xslt';
     $xpath->registerNamespace('cfd', 'http://www.sat.gob.mx/cfd/3');

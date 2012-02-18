@@ -1595,14 +1595,32 @@ function cfdr_import_load_cfd($uri) {
   // if we're dealing with CFD (and not CFDi)
   if ($doc->isDefaultNamespace('http://www.sat.gob.mx/cfd/2')) {
     $xpath->registerNamespace('cfd', 'http://www.sat.gob.mx/cfd/2');
-    $cfdr->xml_type = CFDR_XML_2;
+    switch ($xpath->query('/cfd:Comprobante/@version')->item(0)->value) {
+      case '2.0':
+        $cfdr->xml_type = CFDR_XML_2;
+        break;
+      case '2.2':
+        $cfdr->xml_type = CFDR_XML_22;
+        break;
+      default:
+        return FALSE;
+    }
   }
-  else if ($doc->lookupPrefix('http://www.sat.gob.mx/cfd/3') == 'cfdi') {
+  else if ($doc->isDefaultNamespace('http://www.sat.gob.mx/cfd/3') || $doc->lookupPrefix('http://www.sat.gob.mx/cfd/3') == 'cfdi') {
     $xpath->registerNamespace('cfd', 'http://www.sat.gob.mx/cfd/3');
     $xpath->registerNamespace('tfd', 'http://www.sat.gob.mx/TimbreFiscalDigital');
     $cfdr->uuid               = $xpath->query('//tfd:TimbreFiscalDigital/@UUID')->item(0)->value;
     $cfdr->no_certificado_sat = $xpath->query('//tfd:TimbreFiscalDigital/@noCertificadoSAT')->item(0)->value;
-    $cfdr->xml_type           = CFDR_XML_3;
+    switch ($xpath->query('/cfd:Comprobante/@version')->item(0)->value) {
+      case '3.0':
+        $cfdr->xml_type = CFDR_XML_3;
+        break;
+      case '3.2':
+        $cfdr->xml_type = CFDR_XML_32;
+        break;
+      default:
+        return FALSE;
+    }
   }
   //I don't want any errors if it's not a CFD
   $fecha_cfd = $xpath->query('/cfd:Comprobante/@fecha');
