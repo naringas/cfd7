@@ -5,6 +5,7 @@ import tempfile
 
 from base64 import b64decode
 from ConfigParser import RawConfigParser
+from email.header import decode_header
 from errno import ENOENT
 from optparse import OptionParser
 from quopri import decodestring
@@ -44,14 +45,14 @@ class Mess(object):
 				if len(disp_parm)%2 != 0: raise ValueError('Malformed Content-Disposition')
 				for name, value in [disp_parm[i:i+2] for i in xrange(0, len(disp_parm), 2)]:
 					if name.lower() == 'filename':
-						self._filename = value
+						self._filename = decode_header(value)[0][0]
 						return self._filename
 				# if that didn't work, try the body parameter: name
 				body_parm = self.parameters if self.parameters else ()
 				if len(body_parm)%2 != 0: raise ValueError('Malformed body parameters')
 				for name, value in [body_parm[i:i+2] for i in xrange(0, len(body_parm), 2)]:
 					if name.lower() == 'name':
-						self._filename = value
+						self._filename = decode_header(value)[0][0]
 						return self._filename
 				# if all fails return ''
 				self._filename = ''
