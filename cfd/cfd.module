@@ -128,13 +128,13 @@ function cfd_validate_schema(&$xml) {
       $schemaFileName = drupal_get_path('module', 'cfd') . '/resources/sat/cfdv2.xsd';
       break;
     case '2.2':
-      $schemaFileName = drupal_get_path('module', 'cfd') . '/resources/sat/cfdv2.xsd';
+      $schemaFileName = drupal_get_path('module', 'cfd') . '/resources/sat/cfdv22.xsd';
       break;
     case '3.0':
       $schemaFileName = drupal_get_path('module', 'cfd') . '/resources/sat/cfdv3_con_tfd.xsd';
       break;
     case '3.2':
-      $schemaFileName = drupal_get_path('module', 'cfd') . '/resources/sat/cfdv3_con_tfd.xsd';
+      $schemaFileName = drupal_get_path('module', 'cfd') . '/resources/sat/cfdv32_con_tfd.xsd';
       break;
     default:
       return FALSE;
@@ -200,13 +200,26 @@ function cfd_validate_sello(&$xml) {
   $xpath = new DOMXPath($doc);
   if ($doc->isDefaultNamespace('http://www.sat.gob.mx/cfd/2')) {
     // for CFD
-    $xsl_content_file = drupal_get_path('module', 'cfd') . '/resources/sat/cadenaoriginal_2_0.xslt';
     $xpath->registerNamespace('cfd', 'http://www.sat.gob.mx/cfd/2');
   }
   else if ($doc->isDefaultNamespace('http://www.sat.gob.mx/cfd/3') || $doc->lookupPrefix('http://www.sat.gob.mx/cfd/3') == 'cfdi') {
     // for CFDI
-    $xsl_content_file = drupal_get_path('module', 'cfd') . '/resources/sat/cadenaoriginal_3_0.xslt';
     $xpath->registerNamespace('cfd', 'http://www.sat.gob.mx/cfd/3');
+  }
+
+  switch ($xpath->query('/cfd:Comprobante/@version')->item(0)->value) {
+    case '2.0':
+      $xsl_content_file = drupal_get_path('module', 'cfd') . '/resources/sat/cadenaoriginal_2_0.xslt';
+      break;
+    case '2.2':
+      $xsl_content_file = drupal_get_path('module', 'cfd') . '/resources/sat/cadenaoriginal_2_2.xslt';
+      break;
+    case '3.0':
+      $xsl_content_file = drupal_get_path('module', 'cfd') . '/resources/sat/cadenaoriginal_3_0.xslt';
+      break;
+    case '3.2':
+      $xsl_content_file = drupal_get_path('module', 'cfd') . '/resources/sat/cadenaoriginal_3_2.xslt';
+      break;
   }
 
   $year = substr($xpath->query('/cfd:Comprobante/@fecha')->item(0)->value, 0, 4);
