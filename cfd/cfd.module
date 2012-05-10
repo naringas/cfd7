@@ -4,9 +4,12 @@
  * Also contatins Schema validation funcitons
  */
 
- define('CFDR_VALID', 1);
- define('CFDR_INVALID', 0);
- define('CFDR_IND', -1);
+define('CFDR_VALID', 1);
+define('CFDR_INVALID', 0);
+define('CFDR_IND', -1);
+// the date July 1st, 2012 at start of day (midnight) in GMT-5 (Mexico daylight saving)
+// is the date cfd v2.0 and v3.0 must change to version x.2
+define('CFD_VERSION_2012', 1341118800);
 
 /**
  * Makes a PDF based on 2 XSL Template files (located in resources/cfd_*.xsl)
@@ -110,11 +113,9 @@ function cfd_validate_schema(&$xml) {
     foreach($complemento_list as $complemento) {
       $doc_el->removeChild($complemento);
     }
-    // $schemaFileName = drupal_get_path('module', 'cfd') . '/resources/sat/cfdv2.xsd';
     $xpath->registerNamespace('cfd', 'http://www.sat.gob.mx/cfd/2');
   }
   else if ($doc->isDefaultNamespace('http://www.sat.gob.mx/cfd/3') || $doc->lookupPrefix('http://www.sat.gob.mx/cfd/3') == 'cfdi') {
-    // $schemaFileName = drupal_get_path('module', 'cfd') . '/resources/sat/cfdv3_con_tfd.xsd';
     $xpath->registerNamespace('cfd', 'http://www.sat.gob.mx/cfd/3');
   }
 
@@ -123,7 +124,8 @@ function cfd_validate_schema(&$xml) {
     $doc_el->removeChild($addenda);
   }
 
-  switch ($xpath->query('/cfd:Comprobante/@version')->item(0)->value) {
+  $version = $xpath->query('/cfd:Comprobante/@version')->item(0)->value;
+  switch ($version) {
     case '2.0':
       $schemaFileName = drupal_get_path('module', 'cfd') . '/resources/sat/cfdv2.xsd';
       break;
@@ -139,6 +141,11 @@ function cfd_validate_schema(&$xml) {
     default:
       return FALSE;
   }
+
+  // have to fail versions x.0 emited after July 1st, 2012 (CFD_VERSION_2012 is in unix time)
+  $date = strtotime($xpath->query('/cfd:Comprobante/@fecha')->item(0)->value);
+  if (($version == '2.0' || $version == '3.0') && $date > CFD_VERSION_2012)
+    return CFDR_INVALID;
 
   $validcfd = @$doc->schemaValidate($schemaFileName);
   // $validcfd = $doc->schemaValidate($schemaFileName);
