@@ -445,10 +445,18 @@ JS;
           }
         break;
         case 'navfc':
-          if (trim($value) == 'NULL' || trim($value) == 'null')
+          $v = trim($value);
+          if (strtolower($v) == 'null')
             $query->isNull('nav_number');
-          else if (trim($value) == '*')
+          else if ($v == '*')
             $query->isNotNull('nav_number');
+          else if (strpos($v, '..') > 0) {
+            $range = explode('..', $v);
+            $range_condition = db_and();
+            $range_condition->condition('nav_number', (int) $range[0], '>=');
+            $range_condition->condition('nav_number', (int) $range[1], '<=');
+            $query->condition($range_condition);
+          }
           else
             $query->condition('nav_number', $value);
         break;
@@ -662,7 +670,7 @@ function cfdr_filters_form() {
     '#size' => 15,
     '#maxlength' => 11,
     '#default_value' => @$_SESSION['cfdr_filters']['navfc'],
-    '#description' => 'Número completo.<br/><em>*</em> busca cualquier número<br/><em>NULL</em> busca los que no tienen número.'
+    '#description' => 'Número completo.<br/><em>*</em> busca cualquier número<br/><em>NULL</em> busca los que no tienen número.<br/><em>1..100</em> busca el rango del 1 al 100.'
   );
 
   // Buttons
