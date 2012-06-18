@@ -87,7 +87,7 @@ class Mess(object):
 			# convert to float then sort then convert back to string while removing the .0 (inserted by float)
 			all_parts = [float(x) for x in self._parts_dict.keys()]
 			all_parts.sort()
-			self.sorted_parts = [str(x) if str(x)[-1]!='0' else str(x)[0] for x in all_parts]
+			self.sorted_parts = [str(x) if str(x)[-1]!='0' else str(x)[:str(x).index('.')] for x in all_parts]
 
 		def _imbue_part_info(self, part_num, part_info):
 			"""part_num has to be a string."""
