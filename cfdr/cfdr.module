@@ -1526,7 +1526,7 @@ function cfdr_view_fail() {
     "Archivo - $fail_dir/",
   );
   // $query = db_query('SELECT xml_filename from {cfdr_fail}');
-  $query = db_select('cfdr_fail', 'cf')->fields('cf');
+  $query = db_select('cfdr_fail', 'cf')->fields('cf')->orderBy('id', 'DESC');
   $query = $query->extend('PagerDefault')->limit(50);
   $results = $query->execute();
 
