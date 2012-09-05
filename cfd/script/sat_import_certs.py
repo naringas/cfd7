@@ -1,6 +1,6 @@
 #!/bin/pyhon
 # -*- coding: utf-8 -*-
-import os, sys, progressbar, MySQLdb
+import os, progressbar, MySQLdb
 from optparse import OptionParser
 from ftplib import FTP, error_reply
 from datetime import datetime
@@ -168,7 +168,7 @@ def main():
 		% (import_filename, replace, sql_table, newlines, ignore_lines)
 
 	# -----SQL-----
-	db_connection = MySQLdb.connect(host=sql_host, port=sql_port, user=sql_user, passwd=sql_passwd, db=sql_database)
+	db_connection = MySQLdb.connect(host=sql_host, port=sql_port, user=sql_user, passwd=sql_passwd, db=sql_database, local_infile=1)
 	cursor = db_connection.cursor()
 	if options.init:
 		if options.verbose:

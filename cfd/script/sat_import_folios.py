@@ -1,6 +1,6 @@
 #!/bin/pyhon
 # -*- coding: utf-8 -*-
-import os, sys, progressbar, MySQLdb
+import os, progressbar, MySQLdb
 from optparse import OptionParser
 from ftplib import FTP, error_reply
 from datetime import datetime
@@ -98,15 +98,16 @@ def main():
 
 	if must_dl:
 		if options.init:
-			resume_from = None
+			resume_from = 0
 			dl_size = remote_filestats['size']
 			dl_filename = filename
+			write_file = open(dl_filename, 'wb') # global
 		else:
 			resume_from = filestats['size']
 			dl_size = remote_filestats['size'] - resume_from
 			dl_filename = filename[:-4] + '_diff' + filename[-4:] # foliosCFD_diff.txt
+			write_file = open(dl_filename, 'ab') # global
 
-		write_file = open(dl_filename, 'wb') # global
 		if options.verbose:
 			widgets = [progressbar.Percentage(), ' ', progressbar.Bar(), ' ', progressbar.ETA(), ' ', progressbar.FileTransferSpeed()]
 			print 'Descargando: ', filename , '\n\ta:', dl_filename
@@ -145,7 +146,7 @@ def main():
 		% (import_filename, sql_table, newlines, ignore_lines)
 
 	# -----SQL-----
-	db_connection = MySQLdb.connect(host=sql_host, port=sql_port, user=sql_user, passwd=sql_passwd, db=sql_database)
+	db_connection = MySQLdb.connect(host=sql_host, port=sql_port, user=sql_user, passwd=sql_passwd, db=sql_database, local_infile=1)
 	cursor = db_connection.cursor()
 	if options.init:
 		if options.verbose:

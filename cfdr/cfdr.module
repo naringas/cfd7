@@ -554,9 +554,11 @@ JS;
       ),
     );
   }
-  return drupal_render(drupal_get_form('cfdr_filters_form')) .
-    theme('table', array('header' => $header, 'rows' => $rows, 'empty' => t('No CFDs available.'))) .
-    theme('pager', array('tags' => array()));
+  $output_form = drupal_get_form('cfdr_filters_form');
+  $output = drupal_render($output_form);
+  $output .= theme('table', array('header' => $header, 'rows' => $rows, 'empty' => t('No CFDs available.')));
+  $output .= theme('pager', array('tags' => array()));
+  return $output;
 }
 
 /**
